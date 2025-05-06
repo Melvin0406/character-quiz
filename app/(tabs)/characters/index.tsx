@@ -43,7 +43,7 @@ export default function AnimeListScreen() {
           page,
           limit: 25,
           q: debouncedQuery || undefined, // solo se incluye si hay búsqueda
-          order_by: 'score',
+          order_by: 'members',
           sort: 'desc',
         });
 
