@@ -1,69 +1,149 @@
-// app/characters/index.tsx
-import React, { useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+// app/(tabs)/characters/index.tsx
+import { JikanClient } from '@tutkli/jikan-ts';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-export default function CharacterSelectionScreen() {
-  const [characterName, setCharacterName] = useState('');
-  const [characters, setCharacters] = useState<string[]>([]);
+const jikanClient = new JikanClient();
 
-  const addCharacter = () => {
-    if (characterName.trim() !== '') {
-      setCharacters((prev) => [...prev, characterName.trim()]);
-      setCharacterName('');
-    }
+type Anime = {
+  mal_id: number;
+  title: string;
+  images: {
+    jpg: {
+      image_url: string;
+    };
   };
+};
+
+export default function AnimeListScreen() {
+  const [animes, setAnimes] = useState<Anime[]>([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [lastPage, setLastPage] = useState<number | null>(null);
+
+
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchAnimes = async () => {
+      setLoading(true);
+      try {
+        const response = await jikanClient.anime.getAnimeSearch({
+          page,
+          limit: 25,
+          order_by: 'score',
+          sort: 'desc',
+        });
+        setAnimes(
+          response.data.filter((anime) => typeof anime.score === 'number')
+        );
+        setLastPage(response.pagination?.last_visible_page ?? null);
+      } catch (error) {
+        console.error('Error fetching animes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnimes();
+  }, [page]);
+
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#666" />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Selecciona tus personajes</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre del personaje"
-        value={characterName}
-        onChangeText={setCharacterName}
-      />
-
-      <Button title="Agregar personaje" onPress={addCharacter} />
-
-      <Text style={styles.subtitle}>Tu lista:</Text>
+    <View style={{ flex: 1 }}>
       <FlatList
-        data={characters}
-        keyExtractor={(item, index) => `${item}-${index}`}
+        data={animes}
+        keyExtractor={(item) => item.mal_id.toString()}
         renderItem={({ item }) => (
-          <Text style={styles.listItem}>• {item}</Text>
+          <Pressable
+            style={styles.card}
+            onPress={() => router.push(`/characters/${item.mal_id}`)}
+          >
+            <Image source={{ uri: item.images.jpg.image_url }} style={styles.image} />
+            <Text style={styles.title}>{item.title}</Text>
+          </Pressable>
         )}
+        contentContainerStyle={styles.list}
       />
+
+      {/* 🔽 Navegación por páginas 🔽 */}
+      <View style={styles.pagination}>
+        <Pressable
+          disabled={page === 1}
+          onPress={() => setPage((prev) => Math.max(prev - 1, 1))}
+          style={[styles.button, page === 1 && styles.disabled]}
+        >
+          <Text>Anterior</Text>
+        </Pressable>
+        <Text style={styles.pageNumber}>Página {page}</Text>
+        <Pressable
+          disabled={lastPage !== null && page >= lastPage}
+          onPress={() => setPage((prev) => prev + 1)}
+          style={[
+            styles.button,
+            lastPage !== null && page >= lastPage && styles.disabled,
+          ]}
+        >
+          <Text>Siguiente</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    paddingTop: 60,
+  list: {
+    padding: 10,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: '#eef',
+    borderRadius: 12,
+    padding: 10,
+  },
+  image: {
+    width: 50,
+    height: 70,
+    borderRadius: 6,
+    marginRight: 12,
   },
   title: {
-    fontSize: 24,
-    marginBottom: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
   },
-  subtitle: {
-    fontSize: 18,
-    marginTop: 20,
-    marginBottom: 8,
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  button: {
+    backgroundColor: '#ccc',
     padding: 10,
-    marginBottom: 12,
+    marginHorizontal: 10,
     borderRadius: 6,
   },
-  listItem: {
+  disabled: {
+    opacity: 0.5,
+  },
+  pageNumber: {
     fontSize: 16,
-    paddingVertical: 4,
+    fontWeight: 'bold',
   },
 });
