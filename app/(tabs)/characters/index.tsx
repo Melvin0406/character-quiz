@@ -35,9 +35,18 @@ export default function AnimeListScreen() {
           order_by: 'score',
           sort: 'desc',
         });
-        setAnimes(
-          response.data.filter((anime) => typeof anime.score === 'number')
+
+        const animesWithScore = response.data.filter(
+          (anime) => typeof anime.score === 'number'
         );
+
+        const uniqueAnimes = animesWithScore.filter(
+          (anime, index, self) =>
+            index === self.findIndex((a) => a.mal_id === anime.mal_id)
+        );
+
+        setAnimes(uniqueAnimes);
+
         setLastPage(response.pagination?.last_visible_page ?? null);
       } catch (error) {
         console.error('Error fetching animes:', error);
