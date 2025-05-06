@@ -2,7 +2,7 @@
 import { JikanClient } from '@tutkli/jikan-ts';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 const jikanClient = new JikanClient();
 
@@ -21,9 +21,19 @@ export default function AnimeListScreen() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [lastPage, setLastPage] = useState<number | null>(null);
-
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   const router = useRouter();
+
+  // Debounce input para no hacer fetch cada tecla
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      setPage(1); // Reiniciar a la primera página en búsqueda
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
   useEffect(() => {
     const fetchAnimes = async () => {
@@ -32,12 +42,14 @@ export default function AnimeListScreen() {
         const response = await jikanClient.anime.getAnimeSearch({
           page,
           limit: 25,
+          q: debouncedQuery || undefined, // solo se incluye si hay búsqueda
           order_by: 'score',
           sort: 'desc',
         });
 
+
         const animesWithScore = response.data.filter(
-          (anime) => typeof anime.score === 'number'
+          (anime) => typeof anime.score === 'number' || debouncedQuery
         );
 
         const uniqueAnimes = animesWithScore.filter(
@@ -46,7 +58,6 @@ export default function AnimeListScreen() {
         );
 
         setAnimes(uniqueAnimes);
-
         setLastPage(response.pagination?.last_visible_page ?? null);
       } catch (error) {
         console.error('Error fetching animes:', error);
@@ -56,33 +67,38 @@ export default function AnimeListScreen() {
     };
 
     fetchAnimes();
-  }, [page]);
-
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#666" />
-      </View>
-    );
-  }
+  }, [page, debouncedQuery]);
 
   return (
     <View style={{ flex: 1 }}>
-      <FlatList
-        data={animes}
-        keyExtractor={(item) => item.mal_id.toString()}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
-            onPress={() => router.push(`/characters/${item.mal_id}`)}
-          >
-            <Image source={{ uri: item.images.jpg.image_url }} style={styles.image} />
-            <Text style={styles.title}>{item.title}</Text>
-          </Pressable>
-        )}
-        contentContainerStyle={styles.list}
+      {/* 🔍 Input de búsqueda */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Buscar anime..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
       />
+
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#666" />
+        </View>
+      ) : (
+        <FlatList
+          data={animes}
+          keyExtractor={(item) => item.mal_id.toString()}
+          renderItem={({ item }) => (
+            <Pressable
+              style={styles.card}
+              onPress={() => router.push(`/characters/${item.mal_id}`)}
+            >
+              <Image source={{ uri: item.images.jpg.image_url }} style={styles.image} />
+              <Text style={styles.title}>{item.title}</Text>
+            </Pressable>
+          )}
+          contentContainerStyle={styles.list}
+        />
+      )}
 
       {/* 🔽 Navegación por páginas 🔽 */}
       <View style={styles.pagination}>
@@ -110,6 +126,14 @@ export default function AnimeListScreen() {
 }
 
 const styles = StyleSheet.create({
+  searchInput: {
+    margin: 10,
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderColor: '#ccc',
+    borderWidth: 1,
+  },
   list: {
     padding: 10,
   },
