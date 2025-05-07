@@ -16,14 +16,14 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: 'blue', // Elige tu color activo
-        // headerShown: false, // Descomentar para que cada stack maneje su propio header
+        headerShown: false, // Descomentar para que cada stack maneje su propio header
       }}>
       <Tabs.Screen name="home" options={{ title: 'Inicio' }} />
       <Tabs.Screen
         name="characters" // Pestaña de personajes/animes
         options={{
           title: 'Animes',
-          // headerShown: false, // Para que el layout de characters maneje su header
+          headerShown: false, // Para que el layout de characters maneje su header
           tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
         }}
       />
