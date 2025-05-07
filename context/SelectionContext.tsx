@@ -5,78 +5,75 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 
 const jikanClient = new JikanClient();
 
-const SELECTED_CHARACTERS_KEY = '@SelectedCharacters_v2'; // v2 para diferenciar de posibles datos antiguos
-const CACHED_ANIMES_DATA_KEY = '@CachedAnimesData_v2';
+const SELECTED_CHARACTER_IDS_KEY = '@SelectedCharacterIDs_v3'; // Nueva versión para evitar conflictos
+const CACHED_ANIMES_DATA_KEY = '@CachedAnimesData_v3';
 
-// Estructura para un personaje seleccionado (guardado localmente)
-export interface SelectedCharacter {
+export interface BasicCharacterInfo { // Para la caché de personajes dentro de un anime
   mal_id: number;
   name: string;
   image_url?: string;
-  anime_id: number; // ID del anime al que pertenece
-  anime_title: string; // Título del anime para referencia rápida
 }
 
-// Estructura para los datos de un anime cacheado
 export interface CachedAnimeInfo {
   mal_id: number;
   title: string;
-  image_url: string; // Imagen del anime
-  characters: SelectedCharacter[]; // Lista de personajes principales de este anime
+  image_url: string;
+  characters: BasicCharacterInfo[];
+}
+
+export interface DetailedCharacterView { // Para pasar a la pantalla de personajes y al añadir
+  mal_id: number;
+  name: string;
+  image_url?: string;
+  anime_id: number; 
+  anime_title: string; 
 }
 
 interface SelectionContextType {
-  selectedCharacters: SelectedCharacter[];
-  cachedAnimesData: Record<number, CachedAnimeInfo>; // { [animeId: number]: CachedAnimeInfo }
-  isLoading: boolean; // Para saber si se está cargando desde AsyncStorage
-  addCharacter: (character: SelectedCharacter) => Promise<void>;
+  selectedCharacterIds: Set<number>;
+  cachedAnimesData: Record<number, CachedAnimeInfo>;
+  isLoading: boolean;
+  addCharacter: (character: DetailedCharacterView) => Promise<void>; // Recibe el detallado para contexto
   removeCharacter: (characterId: number) => Promise<void>;
-  handleAnimeCheckboxToggle: (animeId: number, animeTitle: string, animeImageUrl: string, navigateToCharacters: () => void) => Promise<void>;
+  handleAnimeCheckboxToggle: (animeId: number, animeTitle: string, animeImageUrl: string) => Promise<void>;
   isCharacterSelected: (characterId: number) => boolean;
-  isAnimeSelected: (animeId: number) => boolean; // Indica si AL MENOS un personaje de ese anime está seleccionado
-  getCharactersForAnimeScreen: (animeId: number, animeTitle: string, animeImageUrl: string) => Promise<SelectedCharacter[]>; // Para la pantalla de personajes
-  clearAllSelections: () => Promise<void>; // Utilidad
+  isAnimeSelected: (animeId: number) => boolean;
+  getCharactersForAnimeScreen: (animeId: number, animeTitle: string, animeImageUrl: string) => Promise<DetailedCharacterView[]>;
+  clearAllSelections: () => Promise<void>;
 }
 
 const SelectionContext = createContext<SelectionContextType | undefined>(undefined);
 
 export const SelectionProvider = ({ children }: { children: ReactNode }) => {
-  const [selectedCharacters, setSelectedCharacters] = useState<SelectedCharacter[]>([]);
+  const [selectedCharacterIds, setSelectedCharacterIds] = useState<Set<number>>(new Set());
   const [cachedAnimesData, setCachedAnimesData] = useState<Record<number, CachedAnimeInfo>>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  // Cargar datos desde AsyncStorage al iniciar
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const storedSelectedChars = await AsyncStorage.getItem(SELECTED_CHARACTERS_KEY);
-        if (storedSelectedChars) {
-          setSelectedCharacters(JSON.parse(storedSelectedChars));
+        const storedSelectedCharIds = await AsyncStorage.getItem(SELECTED_CHARACTER_IDS_KEY);
+        if (storedSelectedCharIds) {
+          setSelectedCharacterIds(new Set(JSON.parse(storedSelectedCharIds)));
         }
         const storedCachedAnimes = await AsyncStorage.getItem(CACHED_ANIMES_DATA_KEY);
         if (storedCachedAnimes) {
           setCachedAnimesData(JSON.parse(storedCachedAnimes));
         }
-      } catch (error) {
-        console.error('Error loading data from AsyncStorage:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      } catch (error) { /* ... */ } finally { setIsLoading(false); }
     };
     loadData();
   }, []);
 
-  // Guardar selectedCharacters en AsyncStorage cuando cambie
   useEffect(() => {
-    if (!isLoading) { // No guardar mientras se está cargando inicialmente
-      AsyncStorage.setItem(SELECTED_CHARACTERS_KEY, JSON.stringify(selectedCharacters))
-        .catch(error => console.error('Error saving selected characters:', error));
+    if (!isLoading) {
+      AsyncStorage.setItem(SELECTED_CHARACTER_IDS_KEY, JSON.stringify(Array.from(selectedCharacterIds)))
+        .catch(error => console.error('Error saving selected character IDs:', error));
     }
-  }, [selectedCharacters, isLoading]);
+  }, [selectedCharacterIds, isLoading]);
 
-  // Guardar cachedAnimesData en AsyncStorage cuando cambie
-  useEffect(() => {
+  useEffect(() => { // Este para cachedAnimesData sigue igual
     if (!isLoading) {
       AsyncStorage.setItem(CACHED_ANIMES_DATA_KEY, JSON.stringify(cachedAnimesData))
         .catch(error => console.error('Error saving cached anime data:', error));
@@ -84,147 +81,147 @@ export const SelectionProvider = ({ children }: { children: ReactNode }) => {
   }, [cachedAnimesData, isLoading]);
 
   const isCharacterSelected = useCallback((characterId: number) => {
-    return selectedCharacters.some((c) => c.mal_id === characterId);
-  }, [selectedCharacters]);
+    return selectedCharacterIds.has(characterId);
+  }, [selectedCharacterIds]);
 
-  const isAnimeSelected = useCallback((animeId: number) => {
-    return selectedCharacters.some((c) => c.anime_id === animeId);
-  }, [selectedCharacters]);
+  const isAnimeSelected = useCallback((animeId: number): boolean => {
+    if (isLoading) return false; 
 
-  const addCharacter = async (character: SelectedCharacter) => {
-    setSelectedCharacters((prev) => {
-      if (!prev.find(c => c.mal_id === character.mal_id)) {
-        return [...prev, character];
-      }
-      return prev;
-    });
-    // Asegurar que el anime y sus personajes (si ya se hizo fetch) estén cacheados
-    // Esto se manejará principalmente en getCharactersForAnimeScreen
+    const animeCacheEntry = cachedAnimesData[animeId];
+    if (!animeCacheEntry || !animeCacheEntry.characters || animeCacheEntry.characters.length === 0) {
+      return false;
+    }
+    return animeCacheEntry.characters.some(char => selectedCharacterIds.has(char.mal_id));
+  }, [selectedCharacterIds, cachedAnimesData, isLoading]);
+
+  const addCharacter = async (character: DetailedCharacterView) => { // Recibe DetailedCharacterView
+    setSelectedCharacterIds(prev => new Set([...Array.from(prev), character.mal_id]));
+    // Lógica adicional si se necesita asegurar que el anime de `character.anime_id` esté en caché.
+    // Normalmente, getCharactersForAnimeScreen ya lo habría hecho si se llegó desde la pantalla de personajes.
   };
 
   const removeCharacter = async (characterId: number) => {
-    setSelectedCharacters((prev) => prev.filter((c) => c.mal_id !== characterId));
+    setSelectedCharacterIds(prev => {
+      const next = new Set(prev);
+      next.delete(characterId);
+      return next;
+    });
   };
 
   const getCharactersForAnimeScreen = async (
     animeId: number,
     animeTitle: string,
     animeImageUrl: string
-  ): Promise<SelectedCharacter[]> => {
-    // 1. Intentar desde la caché
-    if (cachedAnimesData[animeId] && cachedAnimesData[animeId].characters.length > 0) {
+  ): Promise<DetailedCharacterView[]> => {
+    if (cachedAnimesData[animeId]?.characters?.length > 0) {
       console.log(`Characters for ${animeTitle} (ID: ${animeId}) found in cache.`);
-      return cachedAnimesData[animeId].characters;
+      return cachedAnimesData[animeId].characters.map(bc => ({
+        ...bc, // bc es BasicCharacterInfo
+        anime_id: animeId,
+        anime_title: animeTitle
+      }));
     }
 
-    // 2. Si no está en caché, hacer fetch (SOLO aquí se hace fetch de personajes)
     console.log(`Workspaceing characters for ${animeTitle} (ID: ${animeId}) from API.`);
     try {
       const response = await jikanClient.anime.getAnimeCharacters(animeId);
-      const fetchedApiCharacters = response.data
-        .filter((item) => item.role === 'Main') // O tu lógica de filtrado
-        .map((item) => ({
+      // Mapear a BasicCharacterInfo para la caché
+      const fetchedCharactersAsBasic: BasicCharacterInfo[] = response.data
+        .filter(item => item.role === 'Main')
+        .map(item => ({
           mal_id: item.character.mal_id,
           name: item.character.name,
           image_url: item.character.images.jpg.image_url,
-          anime_id: animeId,
-          anime_title: animeTitle,
         }));
 
-      // Actualizar caché
       setCachedAnimesData(prevCache => ({
         ...prevCache,
         [animeId]: {
           mal_id: animeId,
           title: animeTitle,
           image_url: animeImageUrl,
-          characters: fetchedApiCharacters,
+          characters: fetchedCharactersAsBasic,
         },
       }));
-      return fetchedApiCharacters;
+      // Mapear a DetailedCharacterView para el retorno
+      return fetchedCharactersAsBasic.map(bc => ({
+        ...bc,
+        anime_id: animeId,
+        anime_title: animeTitle
+      }));
     } catch (error) {
       console.error(`Error fetching characters for anime ${animeId}:`, error);
-      // Si falla el fetch, devolver un array vacío o los datos cacheados (si existen parcialmente)
-      // pero sin la lista completa de personajes.
-      // También, guardar el anime en caché sin personajes para no reintentar inmediatamente.
       setCachedAnimesData(prevCache => ({
         ...prevCache,
-        [animeId]: { // Guardar la info básica del anime incluso si falla el fetch de personajes
+        [animeId]: {
           mal_id: animeId,
           title: animeTitle,
           image_url: animeImageUrl,
-          characters: prevCache[animeId]?.characters || [], // Mantener personajes si ya había algo
+          characters: prevCache[animeId]?.characters || [],
         },
       }));
-      return cachedAnimesData[animeId]?.characters || [];
+      const existingCachedChars = cachedAnimesData[animeId]?.characters || [];
+      return existingCachedChars.map(bc => ({...bc, anime_id: animeId, anime_title: animeTitle}));
     }
   };
 
-  // Lógica para el checkbox del anime en la AnimeListScreen
   const handleAnimeCheckboxToggle = async (
     animeId: number,
     animeTitle: string,
     animeImageUrl: string
-    // Ya NO se necesita navigateToCharacters como parámetro para esta lógica específica
   ) => {
-    const charactersFromThisAnimeCurrentlySelected = selectedCharacters.filter(c => c.anime_id === animeId);
+    // Evaluar el estado actual del checkbox ANTES de cualquier cambio
+    const currentlySelectedBasedOnItsChars = isAnimeSelected(animeId);
 
-    if (charactersFromThisAnimeCurrentlySelected.length > 0) {
-      // Si hay personajes seleccionados -> deseleccionar TODOS los de este anime
-      setSelectedCharacters(prev => prev.filter(c => c.anime_id !== animeId));
-      console.log(`Deseleccionados todos los personajes de: ${animeTitle}`);
-    } else {
-      // Si NO hay personajes seleccionados -> hacer fetch (o usar caché) y seleccionar TODOS
-      console.log(`Checkbox de ${animeTitle} (ID: ${animeId}) clickeado (sin selecciones previas), intentando seleccionar todos...`);
-      
-      // 1. Obtener todos los personajes principales para este anime
-      // Esta función ya maneja la caché y el fetch a la API si es necesario.
-      const allMainCharactersOfAnime = await getCharactersForAnimeScreen(animeId, animeTitle, animeImageUrl);
+    const charactersInThisAnimeCached = cachedAnimesData[animeId]?.characters;
 
-      if (allMainCharactersOfAnime && allMainCharactersOfAnime.length > 0) {
-        // 2. Añadir estos personajes a la lista de seleccionados, evitando duplicados
-        //    (aunque en este flujo, si `charactersFromThisAnimeCurrentlySelected.length` era 0, no debería haber duplicados de *este* anime)
-        
-        // Crear un Set de los IDs de personajes ya seleccionados para una verificación eficiente
-        const currentlySelectedCharacterIds = new Set(selectedCharacters.map(c => c.mal_id));
-        
-        // Filtrar los personajes del anime que no están ya en la lista global de seleccionados
-        const newCharactersToAdd = allMainCharactersOfAnime.filter(
-            char => !currentlySelectedCharacterIds.has(char.mal_id)
-        );
-
-        if (newCharactersToAdd.length > 0) {
-          setSelectedCharacters(prevSelectedChars => [...prevSelectedChars, ...newCharactersToAdd]);
-          console.log(`Seleccionados ${newCharactersToAdd.length} nuevos personajes de: ${animeTitle}. Total de personajes del anime: ${allMainCharactersOfAnime.length}.`);
-        } else if (allMainCharactersOfAnime.length > 0) {
-          // Esto podría pasar si los personajes ya estaban seleccionados por algún otro medio pero el conteo inicial dio 0 (poco probable con la lógica actual)
-          // O si todos los personajes del anime ya estaban seleccionados y esta función se llamó incorrectamente.
-          console.log(`Todos los personajes de ${animeTitle} ya estaban en la lista de seleccionados.`);
-        }
-        // Si newCharactersToAdd.length es 0 y allMainCharactersOfAnime.length > 0,
-        // significa que todos los personajes de este anime ya estaban seleccionados globalmente.
-        // El checkbox debería haberse mostrado como marcado debido a isAnimeSelected.
-        // Este bloque asegura que se añadan solo los que falten.
+    if (currentlySelectedBasedOnItsChars) {
+      // Si está marcado (o debería estarlo) -> deseleccionar TODOS los personajes de este anime de la lista global
+      if (charactersInThisAnimeCached && charactersInThisAnimeCached.length > 0) {
+        const idsToRemove = new Set(charactersInThisAnimeCached.map(c => c.mal_id));
+        setSelectedCharacterIds(prevGlobalIds => {
+          const nextGlobalIds = new Set(prevGlobalIds);
+          idsToRemove.forEach(id => nextGlobalIds.delete(id));
+          return nextGlobalIds;
+        });
+        console.log(`Deseleccionados globalmente los personajes de: ${animeTitle}`);
       } else {
-        console.log(`No se encontraron personajes para seleccionar para: ${animeTitle} (ID: ${animeId}) o la lista está vacía.`);
+        // No hay personajes en caché para este anime, o la lista está vacía.
+        // Si estaba marcado, es una situación extraña. No se puede hacer mucho sin saber qué personajes deseleccionar.
+        // Podríamos intentar un fetch aquí para ser exhaustivos, pero va contra la idea de minimizar fetches.
+        console.log(`Checkbox de ${animeTitle} estaba marcado pero no se encontraron personajes en caché para deseleccionar.`);
+        // Forzar fetch y luego deseleccionar podría ser una opción si este caso es problemático:
+        // const charsToDeselect = await getCharactersForAnimeScreen(animeId, animeTitle, animeImageUrl);
+        // if (charsToDeselect.length > 0) { /* ... lógica de deselección ... */ }
+      }
+    } else {
+      // Si el checkbox estaba vacío (o debería estarlo) -> seleccionar TODOS los personajes de este anime globalmente
+      console.log(`Checkbox de ${animeTitle} (ID: ${animeId}) clickeado (vacío), seleccionando todos sus personajes...`);
+      
+      const allCharsForThisAnime = await getCharactersForAnimeScreen(animeId, animeTitle, animeImageUrl); // Asegura caché y devuelve DetailedCharacterView[]
+
+      if (allCharsForThisAnime && allCharsForThisAnime.length > 0) {
+        const idsToSelect = allCharsForThisAnime.map(c => c.mal_id);
+        setSelectedCharacterIds(prevGlobalIds => new Set([...Array.from(prevGlobalIds), ...idsToSelect]));
+        console.log(`Añadidos/Confirmados ${idsToSelect.length} IDs de personajes globalmente de: ${animeTitle}.`);
+      } else {
+        console.log(`No se encontraron personajes para seleccionar para: ${animeTitle} (ID: ${animeId}) o la lista de personajes está vacía.`);
       }
     }
   };
   
   const clearAllSelections = async () => {
-    setSelectedCharacters([]);
-    setCachedAnimesData({}); // Opcional: decidir si quieres limpiar la caché de animes también
-    // await AsyncStorage.removeItem(SELECTED_CHARACTERS_KEY);
-    // await AsyncStorage.removeItem(CACHED_ANIMES_DATA_KEY);
-    // Los useEffect se encargarán de persistir el estado vacío.
-    console.log("Todas las selecciones y caché borradas.");
+    setSelectedCharacterIds(new Set());
+    // Considera si quieres limpiar toda la caché de animes también, o solo las selecciones.
+    // setCachedAnimesData({}); 
+    console.log("Todas las selecciones de personajes borradas.");
   };
 
 
   return (
     <SelectionContext.Provider
       value={{
-        selectedCharacters,
+        selectedCharacterIds,
         cachedAnimesData,
         isLoading,
         addCharacter,

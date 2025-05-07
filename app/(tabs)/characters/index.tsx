@@ -1,4 +1,3 @@
-// AnimeListScreen.tsx
 import { JikanClient } from '@tutkli/jikan-ts';
 import Checkbox from 'expo-checkbox';
 import { useRouter } from 'expo-router';
@@ -97,8 +96,7 @@ export default function AnimeListScreen() {
             handleAnimeCheckboxToggle(
               item.mal_id, 
               item.title, 
-              item.images.jpg.image_url,
-              () => router.push(`/characters/${item.mal_id}`) // Callback para navegar
+              item.images.jpg.image_url
             );
           }}
           color={isSelected ? '#4630EB' : undefined}

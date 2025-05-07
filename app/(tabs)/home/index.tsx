@@ -17,7 +17,7 @@ export default function HomeScreen() {
       <View style={styles.buttonContainer}>
         <Button
           title="Jugar"
-          onPress={() => router.push({ pathname: '/(tabs)/games/game' })}
+          onPress={() => router.push({ pathname: '/(tabs)/games' })}
         />
       </View>
 

@@ -1,68 +1,62 @@
-// import { JikanClient } from '@tutkli/jikan-ts'; // Ya no se necesita aquí directamente
 import Checkbox from 'expo-checkbox';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-// Asegúrate que la ruta al contexto es correcta
-import { SelectedCharacter, useSelection } from '../../../context/SelectionContext';
-
-// El tipo CharacterDisplay local para esta pantalla podría ser el mismo que SelectedCharacter
-// o uno específico si necesitas más datos solo para la UI aquí.
-// Usaremos SelectedCharacter por consistencia.
+// Asegúrate que la ruta al contexto es correcta y que SelectedCharacter es el tipo esperado
+// (equivalente a DetailedCharacterView de mi propuesta de contexto)
+import { DetailedCharacterView, useSelection } from '../../../context/SelectionContext';
 
 export default function CharactersScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, title: routeTitle, imageUrl: routeImageUrl } = useLocalSearchParams<{ id: string; title?: string; imageUrl?: string }>(); // Tipar los params
   const animeId = parseInt(id as string, 10);
   
-  const [charactersForDisplay, setCharactersForDisplay] = useState<SelectedCharacter[]>([]);
+  // SelectedCharacter aquí es el tipo DetailedCharacterView del contexto
+  const [charactersForDisplay, setCharactersForDisplay] = useState<DetailedCharacterView[]>([]);
   const [isLoadingScreen, setIsLoadingScreen] = useState(true);
-  const [currentAnimeTitle, setCurrentAnimeTitle] = useState(''); // Para el título de la pantalla
-  const [currentAnimeImageUrl, setCurrentAnimeImageUrl] = useState(''); // Para la caché
+  const [currentAnimeTitle, setCurrentAnimeTitle] = useState(routeTitle || 'Anime'); // Usar título de ruta como fallback
+  // currentAnimeImageUrl no se usa directamente en el render, pero se pasa a getCharactersForAnimeScreen
 
   const { 
     addCharacter, 
     removeCharacter, 
     isCharacterSelected, 
     getCharactersForAnimeScreen,
-    isLoading: isSelectionLoading, // Para saber si el contexto está listo
-    selectedCharacters, // Para el checkbox "Seleccionar Todos"
-    cachedAnimesData, // Para obtener el título del anime si ya está cacheado
+    isLoading: isSelectionLoading, // Para saber si el contexto está listo desde AsyncStorage
+    // selectedCharacterIds, // Ya no se necesita el Set directamente aquí, se usa via isCharacterSelected
+    cachedAnimesData, 
   } = useSelection();
   const navigation = useNavigation();
-  const router = useRouter(); // Para volver atrás
+  const router = useRouter(); 
 
   useEffect(() => {
     const fetchAndSetData = async () => {
-      if (isSelectionLoading || !animeId) return; // Esperar a que el contexto esté listo y tengamos ID
+      if (isSelectionLoading || !animeId) return; 
 
       setIsLoadingScreen(true);
-      // Obtener título e imagen del anime desde la caché si es posible, o de una fuente alternativa
-      // Para este ejemplo, asumiremos que la lista de animes ya nos dio un título básico
-      // o lo obtenemos al hacer el fetch de personajes.
-      // En una app real, podrías pasar el título/imagen como params o tener otra fuente.
       
-      // Intentar obtener el título e imagen de la caché primero
-      let title = cachedAnimesData[animeId]?.title || 'Anime';
-      let imageUrl = cachedAnimesData[animeId]?.image_url || '';
+      // Priorizar título e imagen de la caché si existe, luego de la ruta, luego placeholder
+      const cachedTitle = cachedAnimesData[animeId]?.title;
+      const cachedImageUrl = cachedAnimesData[animeId]?.image_url;
 
-      // Si no está en caché, el título podría venir de params (si lo pasaste) o necesitar un fetch
-      // Aquí, getCharactersForAnimeScreen se encargará de cachear el título e imagen si hace fetch.
-
-      const fetchedChars = await getCharactersForAnimeScreen(animeId, title, imageUrl);
+      const initialTitle = cachedTitle || routeTitle || 'Anime';
+      const initialImageUrl = cachedImageUrl || routeImageUrl || '';
       
-      // Actualizar título e imagen si se obtuvieron/actualizaron
-      if (cachedAnimesData[animeId]) {
-          title = cachedAnimesData[animeId].title;
-          // imageUrl = cachedAnimesData[animeId].image_url; // Ya la tenemos o se usó
+      // Actualizar el título de la pantalla inmediatamente si lo tenemos
+      if (initialTitle !== 'Anime') {
+          setCurrentAnimeTitle(initialTitle);
       }
-      setCurrentAnimeTitle(title); // Actualizar el título de la pantalla
-      setCurrentAnimeImageUrl(imageUrl); // Guardar para uso futuro si es necesario
+
+      const fetchedChars = await getCharactersForAnimeScreen(animeId, initialTitle, initialImageUrl);
+      
+      // Después de que getCharactersForAnimeScreen se ejecute (y potencialmente actualice la caché),
+      // volvemos a leer de la caché para el título final, por si se actualizó.
+      setCurrentAnimeTitle(cachedAnimesData[animeId]?.title || initialTitle);
       setCharactersForDisplay(fetchedChars);
       setIsLoadingScreen(false);
     };
 
     fetchAndSetData();
-  }, [animeId, getCharactersForAnimeScreen, isSelectionLoading, cachedAnimesData]);
+  }, [animeId, getCharactersForAnimeScreen, isSelectionLoading, cachedAnimesData, routeTitle, routeImageUrl]);
 
 
   const allOnScreenCharsSelected = charactersForDisplay.length > 0 && 
@@ -72,16 +66,18 @@ export default function CharactersScreen() {
     if (currentAnimeTitle) {
       navigation.setOptions({
         title: `Personajes de ${currentAnimeTitle}`,
-        headerRight: () => charactersForDisplay.length > 0 ? ( // Solo mostrar si hay personajes
+        headerRight: () => charactersForDisplay.length > 0 ? (
           <Pressable 
             onPress={async () => {
-              if (allOnScreenCharsSelected) { // Deseleccionar todos los de esta pantalla
+              if (allOnScreenCharsSelected) { 
                 for (const char of charactersForDisplay) {
-                  if (isCharacterSelected(char.mal_id)) await removeCharacter(char.mal_id);
+                  // No es necesario verificar isCharacterSelected aquí de nuevo, removeCharacter es idempotente para el Set
+                  await removeCharacter(char.mal_id);
                 }
-              } else { // Seleccionar todos los de esta pantalla
+              } else { 
                 for (const char of charactersForDisplay) {
-                  if (!isCharacterSelected(char.mal_id)) await addCharacter(char);
+                  // addCharacter también es idempotente para el Set si se añade el mismo ID
+                  await addCharacter(char); // char es de tipo SelectedCharacter (DetailedCharacterView)
                 }
               }
             }}
@@ -89,26 +85,23 @@ export default function CharactersScreen() {
           >
             <Checkbox
               value={allOnScreenCharsSelected}
-              // El Pressable maneja el onValueChange implícitamente
               color={allOnScreenCharsSelected ? '#4630EB' : undefined}
             />
             <Text style={{ marginLeft: 8, fontSize: 16, color: '#007AFF' }}>
               {allOnScreenCharsSelected ? 'Deselec. Todos' : 'Selec. Todos'}
             </Text>
           </Pressable>
-        ) : null, // No mostrar si no hay personajes
+        ) : null, 
       });
     }
-  }, [navigation, currentAnimeTitle, charactersForDisplay, allOnScreenCharsSelected, addCharacter, removeCharacter, isCharacterSelected]);
+  }, [navigation, currentAnimeTitle, charactersForDisplay, allOnScreenCharsSelected, addCharacter, removeCharacter]); // isCharacterSelected ya no es una dep directa aquí, allOnScreenCharsSelected la usa
 
 
-  const handleToggleCharacter = async (character: SelectedCharacter) => {
+  const handleToggleCharacter = async (character: DetailedCharacterView) => { // character es DetailedCharacterView
     if (isCharacterSelected(character.mal_id)) {
       await removeCharacter(character.mal_id);
     } else {
-      // Al añadir, nos aseguramos que la info de anime_id y anime_title esté correcta
-      // La función getCharactersForAnimeScreen ya debería haber formateado 'character' correctamente.
-      await addCharacter(character);
+      await addCharacter(character); // Pasamos el objeto completo
     }
   };
 
@@ -123,7 +116,7 @@ export default function CharactersScreen() {
   if (charactersForDisplay.length === 0) {
     return (
         <View style={styles.centered}>
-            <Text>No se encontraron personajes principales para este anime o no se pudo acceder a la API.</Text>
+            <Text style={{textAlign: 'center'}}>No se encontraron personajes principales para "{currentAnimeTitle}" o no se pudo acceder a la API.</Text>
             <Pressable onPress={() => router.back()} style={styles.button}>
                 <Text>Volver</Text>
             </Pressable>
@@ -135,7 +128,7 @@ export default function CharactersScreen() {
     <FlatList
       data={charactersForDisplay}
       keyExtractor={(item) => item.mal_id.toString()}
-      renderItem={({ item }) => (
+      renderItem={({ item }) => ( // item es SelectedCharacter (DetailedCharacterView)
         <View style={styles.card}>
           <Image source={{ uri: item.image_url }} style={styles.image} />
           <Text style={styles.name}>{item.name}</Text>
@@ -152,7 +145,6 @@ export default function CharactersScreen() {
   );
 }
 
-// ... tus estilos (añadir estilo para botón de volver si es necesario)
 const styles = StyleSheet.create({
   list: {
     padding: 10,
@@ -192,7 +184,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-   button: { // Estilo para el botón de volver
+   button: { 
     marginTop: 20,
     backgroundColor: '#ddd',
     paddingVertical: 10,
