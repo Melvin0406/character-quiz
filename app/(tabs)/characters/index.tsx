@@ -2,8 +2,9 @@ import { JikanClient } from '@tutkli/jikan-ts';
 import Checkbox from 'expo-checkbox';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 // Asegúrate que la ruta al contexto es correcta
+import FastImage from '@d11/react-native-fast-image';
 import { useSelection } from '../../../context/SelectionContext';
 
 const jikanClient = new JikanClient();
@@ -86,7 +87,15 @@ export default function AnimeListScreen() {
           style={styles.animeInfoContainer}
           onPress={() => router.push(`/characters/${item.mal_id}`)}
         >
-          <Image source={{ uri: item.images.jpg.image_url }} style={styles.image} />
+          <FastImage
+            style={styles.image}
+            source={{
+                uri: item.images.jpg.image_url,
+                priority: FastImage.priority.normal, // Prioridad normal de carga
+                cache: FastImage.cacheControl.immutable // Ideal para URLs que no cambian
+            }}
+            resizeMode={FastImage.resizeMode.cover}
+          />
           <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
         </Pressable>
         <Checkbox

@@ -1,9 +1,10 @@
 import Checkbox from 'expo-checkbox';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 // Asegúrate que la ruta al contexto es correcta y que SelectedCharacter es el tipo esperado
 // (equivalente a DetailedCharacterView de mi propuesta de contexto)
+import FastImage from '@d11/react-native-fast-image';
 import { DetailedCharacterView, useSelection } from '../../../context/SelectionContext';
 
 export default function CharactersScreen() {
@@ -130,7 +131,15 @@ export default function CharactersScreen() {
       keyExtractor={(item) => item.mal_id.toString()}
       renderItem={({ item }) => ( // item es SelectedCharacter (DetailedCharacterView)
         <View style={styles.card}>
-          <Image source={{ uri: item.image_url }} style={styles.image} />
+          <FastImage
+                style={styles.image}
+                source={{
+                    uri: item.image_url, // Asumiendo que image_url está en DetailedCharacterView
+                    priority: FastImage.priority.normal,
+                    cache: FastImage.cacheControl.immutable,
+                }}
+                resizeMode={FastImage.resizeMode.cover} // O 'contain'
+            />
           <Text style={styles.name}>{item.name}</Text>
           <Checkbox
             style={styles.checkbox}

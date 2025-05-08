@@ -1,4 +1,5 @@
 // /app/(tabs)/games/mimicsGame.tsx
+import FastImage from '@d11/react-native-fast-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -308,11 +309,19 @@ export default function MimicsGameScreen() {
             <Text style={styles.characterPrompt}>¡Actúa como!</Text>
             {/* ... (mostrar imagen, nombre, anime_title) ... */}
             {currentCharacter.image_url ? (
-              <Image source={{ uri: currentCharacter.image_url }} style={styles.characterImage} resizeMode="contain" />
+            <FastImage 
+                style={styles.characterImage}
+                source={{ 
+                    uri: currentCharacter.image_url,
+                    priority: FastImage.priority.normal, // Normal para el juego está bien
+                    cache: FastImage.cacheControl.immutable,
+                }} 
+                resizeMode={FastImage.resizeMode.contain} // Mantener 'contain' que tenías
+            />
             ) : (
-              <View style={styles.noImagePlaceholder}>
+            <View style={styles.noImagePlaceholder}>
                 <Text style={styles.noImageText}>Sin imagen</Text>
-              </View>
+            </View>
             )}
             <Text style={styles.characterName}>{currentCharacter.name}</Text>
             <Text style={styles.animeTitleText}>Del anime: {currentCharacter.anime_title}</Text>
