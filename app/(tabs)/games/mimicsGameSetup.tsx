@@ -147,16 +147,22 @@ export default function MimicsGameSetupScreen() {
       />
       
       <View style={styles.infoBox}>
-        <FontAwesome name="info-circle" size={20} color="#007AFF" style={{marginRight: 10}}/>
-        <View>
-            <Text style={styles.infoText}>
-                Se usarán los <Text style={{fontWeight: 'bold'}}>{characterListForGame.length}</Text> personajes de tu lista personal.
+        {/* Icono */}
+        <FontAwesome name="info-circle" size={20} color="#007AFF" style={styles.infoIcon}/> 
+        
+        {/* Contenedor para los textos que ocupará el espacio restante */}
+        <View style={styles.infoTextContainer}> 
+          {/* Primer texto (ya NO usa flex: 1 directamente) */}
+          <Text style={styles.infoTextBase}>
+            Se usarán los <Text style={styles.infoTextBold}>{characterListForGame.length}</Text> personajes de tu lista personal.
+          </Text>
+          
+          {/* Segundo texto (condicional, tampoco usa flex: 1) */}
+          {characterListForGame.length < MIN_CHARACTERS_TO_PLAY && (
+            <Text style={[styles.infoTextBase, styles.infoTextWarning]}>
+              (Necesitas al menos {MIN_CHARACTERS_TO_PLAY} para jugar)
             </Text>
-            {characterListForGame.length < MIN_CHARACTERS_TO_PLAY && (
-                <Text style={[styles.infoText, {color: 'red', marginTop: 5}]}>
-                    (Necesitas al menos {MIN_CHARACTERS_TO_PLAY} para jugar)
-                </Text>
-            )}
+          )}
         </View>
       </View>
 
@@ -257,12 +263,36 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   infoBox: {
-    flexDirection: 'row',
-    backgroundColor: '#e7f3ff',
+    flexDirection: 'row',       // Icono al lado del texto
+    backgroundColor: '#e7f3ff', // Fondo azul claro
     padding: 15,
     borderRadius: 8,
     marginBottom: 25,
-    alignItems: 'flex-start', // Para que el icono se alinee con la primera línea de texto
+    alignItems: 'flex-start',   // Alinear icono arriba con el texto
+    },
+  infoIcon: {
+    marginRight: 10,         // Espacio entre icono y texto
+    marginTop: 2,            // Ajuste vertical fino del icono
+  },
+  infoTextContainer: {
+    flex: 1,                 // Este View ocupa el espacio restante en la fila
+    // Por defecto tiene flexDirection: 'column', que está bien aquí
+  },
+  // Estilo base para ambos textos dentro del infoBox
+  infoTextBase: { 
+    fontSize: 14,
+    color: '#0052cc',        // Color azul oscuro para el texto principal
+    lineHeight: 20,
+    // Quitado: flex: 1 
+  },
+  // Estilo solo para la parte en negrita
+  infoTextBold: {
+    fontWeight: 'bold',
+  },
+  // Estilo para el texto de advertencia
+  infoTextWarning: {
+    color: 'red',             // Color rojo para advertencia
+    marginTop: 5,             // Espacio arriba si aparece
   },
   infoText: {
     flex: 1, // Permite que el texto haga wrap

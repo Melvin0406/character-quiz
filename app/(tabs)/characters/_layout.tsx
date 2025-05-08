@@ -1,15 +1,20 @@
-// _layout.tsx (o tu archivo de layout raíz)
-import { Stack } from 'expo-router';
-import { SelectionProvider } from '../../../context/SelectionContext';
+// /app/(tabs)/characters/_layout.tsx 
 
-export default function RootLayout() {
+import { Stack } from 'expo-router';
+import React from 'react'; // Añadir import React si no estaba
+
+export default function CharactersStackLayout() {
   return (
-    <SelectionProvider>
-      <Stack>
-        <Stack.Screen name="index" options={{ title: 'Lista de Animes' }} />
-        <Stack.Screen name="[id]" options={{ title: 'Personajes' }} />
-        {/* Agrega otras pantallas aquí si es necesario */}
-      </Stack>
-    </SelectionProvider>
+    <Stack>
+      <Stack.Screen 
+        name="index" // -> /app/(tabs)/characters/index.tsx (AnimeListScreen)
+        options={{ title: 'Animes' }} // O el título que prefieras
+      />
+      <Stack.Screen 
+        name="[id]"  // -> /app/(tabs)/characters/[id].tsx (CharactersScreen)
+        options={{ title: 'Personajes' }} 
+      />
+      {/* Otras pantallas dentro de esta pestaña si las hubiera */}
+    </Stack>
   );
 }

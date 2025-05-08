@@ -7,7 +7,7 @@ export default function RootLayout() {
   // Aquí puedes añadir otros providers globales si los tienes
   return (
     <SelectionProvider>
-      <Slot /> {/* Slot renderizará tus (tabs)/_layout.tsx y su contenido */}
+      <Slot />
     </SelectionProvider>
   );
 }

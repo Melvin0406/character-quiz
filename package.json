@@ -11,6 +11,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@d11/react-native-fast-image": "^8.9.2",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-navigation/bottom-tabs": "^7.3.10",
@@ -22,6 +23,7 @@
     "axios-cache-interceptor": "^1.8.0",
     "expo": "~53.0.7",
     "expo-blur": "~14.1.4",
+    "expo-checkbox": "~4.1.4",
     "expo-constants": "~17.1.5",
     "expo-font": "~13.3.1",
     "expo-haptics": "~14.1.4",
@@ -45,7 +47,7 @@
     "react-native-svg": "15.11.2",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
-    "expo-checkbox": "~4.1.4"
+    "expo-dev-client": "~5.1.8"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
