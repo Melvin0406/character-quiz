@@ -25,6 +25,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="characterquiz"/>
+        <data android:scheme="exp+character-quiz"/>
       </intent-filter>
     </activity>
   </application>
