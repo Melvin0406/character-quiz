@@ -17,8 +17,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.melvin0406.characterquiz",
-      "googleServicesFile": "./google-services.json"
+      "package": "com.melvin0406.characterquiz"
     },
     "web": {
       "bundler": "metro",

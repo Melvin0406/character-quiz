@@ -38,6 +38,6 @@ yarn-error.*
 *.tsbuildinfo
 
 # Firebase
-google-services.json
+# google-services.json
 
 app-example

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "239896040768",
+    "project_id": "otaquiz-app",
+    "storage_bucket": "otaquiz-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:239896040768:android:87c3afe947ba875dcb56a5",
+        "android_client_info": {
+          "package_name": "com.melvin0406.characterquiz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCqJBHTyoUOKtuHhhdsY6ur3u--hFWtDwg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
