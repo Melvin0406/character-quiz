@@ -30,6 +30,7 @@
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "./withAppGlideModule.js",
+      "./withExcludeFastImageAppGlideModule.js",
       [
         "expo-splash-screen",
         {
@@ -38,7 +39,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
