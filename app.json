@@ -37,6 +37,19 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "gradleProperties": [
+              {
+                "property": "excludeAppGlideModule",
+                "value": "true"
+              }
+            ]
+          }
+        }
       ]
     ],
     "experiments": {
