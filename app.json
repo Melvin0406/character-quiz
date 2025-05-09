@@ -29,6 +29,7 @@
       "expo-router",
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
+      "./withAppGlideModule.js",
       [
         "expo-splash-screen",
         {
@@ -36,19 +37,6 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "gradleProperties": [
-              {
-                "property": "excludeAppGlideModule",
-                "value": "true"
-              }
-            ]
-          }
         }
       ]
     ],
