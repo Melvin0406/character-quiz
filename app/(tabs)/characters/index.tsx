@@ -85,7 +85,10 @@ export default function AnimeListScreen() {
       <View style={styles.card}>
         <Pressable
           style={styles.animeInfoContainer}
-          onPress={() => router.push(`/characters/${item.mal_id}`)}
+          onPress={() => router.push({
+            pathname: `/characters/${item.mal_id}`,
+            params: { title: item.title, imageUrl: item.images.jpg.image_url } // Esencial pasar esto
+          })}
         >
           <FastImage
             style={styles.image}

@@ -191,27 +191,129 @@ export const SelectionProvider = ({ children }: { children: ReactNode }) => {
     setSelectedCharacterIds(prev => { const next = new Set(prev); next.delete(characterId); return next; });
   };
 
-  const getCharactersForAnimeScreen = async (animeId: number, animeTitle: string, animeImageUrl: string): Promise<DetailedCharacterView[]> => {
-    if (cachedAnimesData[animeId]?.characters?.length > 0) {
-        return cachedAnimesData[animeId].characters.map(bc => ({ ...bc, anime_id: animeId, anime_title: animeTitle }));
+  const getCharactersForAnimeScreen = async (
+    animeId: number,
+    callerProvidedTitle: string,
+    callerProvidedImageUrl: string
+  ): Promise<DetailedCharacterView[]> => {
+    
+    let definitiveTitle = callerProvidedTitle;
+    let definitiveImageUrl = callerProvidedImageUrl;
+    let metadataWasRefreshed = false; // Para saber si obtuvimos metadatos frescos en esta llamada
+
+    // Condición para determinar si necesitamos obtener/refrescar los metadatos del anime
+    const currentCachedEntry = cachedAnimesData[animeId];
+    const needsFreshAnimeMetadata = 
+      !currentCachedEntry?.title || 
+      currentCachedEntry?.title === 'Anime' || 
+      !currentCachedEntry?.image_url ||
+      callerProvidedTitle === 'Anime' || 
+      callerProvidedTitle === '' ||
+      callerProvidedImageUrl === '';
+
+    // Intentar obtener detalles del anime si los metadatos parecen placeholders O no existen en caché,
+    // Y SI ADEMÁS no tenemos ya los personajes cacheados (para evitar fetch de anime si solo queremos chars cacheados).
+    if (needsFreshAnimeMetadata && !currentCachedEntry?.characters?.length) {
+      console.log(`SelectionContext: Metadatos para anime ID ${animeId} (Título provisto: "${callerProvidedTitle}") parecen placeholders o faltan. Intentando fetch de detalles del anime...`);
+      try {
+        const animeDetailsResponse = await jikanClient.anime.getAnimeById(animeId);
+        if (animeDetailsResponse.data) {
+          definitiveTitle = animeDetailsResponse.data.title_english || animeDetailsResponse.data.title || callerProvidedTitle; // Fallback al provisto si API no da título
+          definitiveImageUrl = animeDetailsResponse.data.images.jpg.image_url || callerProvidedImageUrl; // Fallback
+          metadataWasRefreshed = true;
+          console.log(`SelectionContext: Metadatos frescos obtenidos para anime ID ${animeId}: Título="${definitiveTitle}"`);
+        }
+      } catch (animeDetailsError) {
+        console.error(`SelectionContext: Falló el fetch de detalles para anime ID ${animeId}. Se usarán los datos provistos por el llamador o caché si existen.`, animeDetailsError);
+        // Si falla, definitiveTitle e definitiveImageUrl conservan los valores de callerProvided o los mejores de la caché
+        if (currentCachedEntry?.title && currentCachedEntry.title !== 'Anime') {
+            definitiveTitle = currentCachedEntry.title;
+        }
+        if (currentCachedEntry?.image_url) {
+            definitiveImageUrl = currentCachedEntry.image_url;
+        }
+      }
+    } else if (currentCachedEntry?.title && currentCachedEntry.title !== 'Anime') {
+      // Si ya tenemos buenos metadatos en caché y no necesitamos refrescar (o ya tenemos personajes), usarlos.
+      definitiveTitle = currentCachedEntry.title;
+      definitiveImageUrl = currentCachedEntry.image_url;
     }
-    try {
-        const response = await jikanClient.anime.getAnimeCharacters(animeId);
-        const fetchedCharactersAsBasic: BasicCharacterInfo[] = response.data
-          .filter(item => item.role === 'Main').map(item => ({
-            mal_id: item.character.mal_id, name: item.character.name, image_url: item.character.images.jpg.image_url,
+
+    // ---- INICIO DE LA SECCIÓN CORREGIDA ----
+    // Ahora, proceder a verificar/obtener personajes
+    if (currentCachedEntry?.characters?.length > 0) {
+      console.log(`SelectionContext: Personajes para "${definitiveTitle}" (ID: ${animeId}) encontrados en caché.`);
+      
+      // Si los metadatos en la caché para este anime son placeholders ("Anime" o URL vacía)
+      // Y ahora tenemos un definitiveTitle/definitiveImageUrl mejor (porque se refrescaron o el llamador los pasó bien)
+      // Actualizamos la entrada de la caché solo para los metadatos, manteniendo los personajes existentes.
+      const needsMetadataUpdateInCache = 
+          (currentCachedEntry.title === 'Anime' && definitiveTitle !== 'Anime') ||
+          (!currentCachedEntry.image_url && definitiveImageUrl !== '');
+
+      if (needsMetadataUpdateInCache) {
+          console.log(`SelectionContext: Actualizando metadatos stale en caché para anime ID ${animeId} (Título: "${definitiveTitle}", Imagen: "${definitiveImageUrl ? 'Sí' : 'No'}").`);
+          setCachedAnimesData(prevCache => ({
+              ...prevCache,
+              [animeId]: {
+                  // Mantener lo que ya estaba, especialmente los personajes
+                  ...prevCache[animeId], 
+                  title: definitiveTitle,
+                  image_url: definitiveImageUrl,
+              }
           }));
-        setCachedAnimesData(prevCache => ({ 
-          ...prevCache, [animeId]: { mal_id: animeId, title: animeTitle, image_url: animeImageUrl, characters: fetchedCharactersAsBasic, },
+      }
+      
+      return currentCachedEntry.characters.map(bc => ({
+        ...bc,
+        anime_id: animeId,
+        // Usar el título de la caché que podría acabar de actualizarse, o el definitiveTitle
+        anime_title: cachedAnimesData[animeId]?.title || definitiveTitle,
+      }));
+    }
+    // ---- FIN DE LA SECCIÓN CORREGIDA ----
+
+    // Si no estaban en caché, hacer fetch de personajes
+    console.log(`SelectionContext: Haciendo fetch de personajes para "${definitiveTitle}" (ID: ${animeId}) desde API.`);
+    try {
+      const response = await jikanClient.anime.getAnimeCharacters(animeId);
+      const fetchedCharactersAsBasic: BasicCharacterInfo[] = response.data
+        .filter(item => item.role === 'Main') // O tu lógica de filtro
+        .map(item => ({
+          mal_id: item.character.mal_id,
+          name: item.character.name,
+          image_url: item.character.images.jpg.image_url,
         }));
-        return fetchedCharactersAsBasic.map(bc => ({ ...bc, anime_id: animeId, anime_title: animeTitle }));
+
+      setCachedAnimesData(prevCache => ({
+        ...prevCache,
+        [animeId]: {
+          mal_id: animeId,
+          title: definitiveTitle, // Usar el título e imagen definitivos
+          image_url: definitiveImageUrl,
+          characters: fetchedCharactersAsBasic,
+        },
+      }));
+      
+      return fetchedCharactersAsBasic.map(bc => ({
+        ...bc,
+        anime_id: animeId,
+        anime_title: definitiveTitle,
+      }));
     } catch (error) {
-        console.error(`SelectionContext: Error fetching characters for anime ${animeId}:`, error);
-        setCachedAnimesData(prevCache => ({ ...prevCache, [animeId]: {
-            mal_id: animeId, title: animeTitle, image_url: animeImageUrl, characters: prevCache[animeId]?.characters || [],
-        },}));
-        const existingCachedChars = cachedAnimesData[animeId]?.characters || [];
-        return existingCachedChars.map(bc => ({...bc, anime_id: animeId, anime_title: animeTitle}));
+      console.error(`SelectionContext: Error en fetch de personajes para anime ID ${animeId}:`, error);
+      // Guardar la entrada del anime con los metadatos definitivos, incluso si los personajes fallan
+      setCachedAnimesData(prevCache => ({
+        ...prevCache,
+        [animeId]: {
+          mal_id: animeId,
+          title: definitiveTitle,
+          image_url: definitiveImageUrl,
+          characters: prevCache[animeId]?.characters || [], 
+        },
+      }));
+      const existingCachedChars = currentCachedEntry?.characters || [];
+      return existingCachedChars.map(bc => ({...bc, anime_id: animeId, anime_title: definitiveTitle}));
     }
   };
 

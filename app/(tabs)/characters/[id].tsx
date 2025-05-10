@@ -35,23 +35,26 @@ export default function CharactersScreen() {
 
       setIsLoadingScreen(true);
       
-      // Priorizar título e imagen de la caché si existe, luego de la ruta, luego placeholder
-      const cachedTitle = cachedAnimesData[animeId]?.title;
-      const cachedImageUrl = cachedAnimesData[animeId]?.image_url;
+      // Priorizar info de la ruta, luego caché (si no es placeholder), luego placeholder
+      const cachedEntry = cachedAnimesData[animeId];
+      let titleForFetch = routeTitle || cachedEntry?.title || 'Anime'; // Título a pasar a getCharactersForAnimeScreen
+      let imageUrlForFetch = routeImageUrl || cachedEntry?.image_url || ''; // Imagen a pasar
 
-      const initialTitle = cachedTitle || routeTitle || 'Anime';
-      const initialImageUrl = cachedImageUrl || routeImageUrl || '';
-      
-      // Actualizar el título de la pantalla inmediatamente si lo tenemos
-      if (initialTitle !== 'Anime') {
-          setCurrentAnimeTitle(initialTitle);
+      // Si la caché tiene "Anime" pero la ruta tiene algo mejor, usar el de la ruta
+      if (titleForFetch === 'Anime' && routeTitle) {
+          titleForFetch = routeTitle;
       }
-
-      const fetchedChars = await getCharactersForAnimeScreen(animeId, initialTitle, initialImageUrl);
+      if (imageUrlForFetch === '' && routeImageUrl) {
+          imageUrlForFetch = routeImageUrl;
+      }
       
-      // Después de que getCharactersForAnimeScreen se ejecute (y potencialmente actualice la caché),
-      // volvemos a leer de la caché para el título final, por si se actualizó.
-      setCurrentAnimeTitle(cachedAnimesData[animeId]?.title || initialTitle);
+      // El título de la pantalla se puede poner con lo que tengamos inicialmente
+      setCurrentAnimeTitle(titleForFetch !== 'Anime' ? titleForFetch : (routeTitle || 'Cargando título...'));
+
+      const fetchedChars = await getCharactersForAnimeScreen(animeId, titleForFetch, imageUrlForFetch);
+      
+      // Actualizar el título de la pantalla con lo que getCharactersForAnimeScreen haya resuelto y cacheado
+      setCurrentAnimeTitle(cachedAnimesData[animeId]?.title || 'Título no disponible');
       setCharactersForDisplay(fetchedChars);
       setIsLoadingScreen(false);
     };
