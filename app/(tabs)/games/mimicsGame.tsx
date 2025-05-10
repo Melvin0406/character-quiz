@@ -224,7 +224,7 @@ export default function MimicsGameScreen() {
   };
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: ReturnType<typeof setInterval>;
     if (isTimerRunning && timeLeft > 0) {
       intervalId = setInterval(() => {
         setTimeLeft(prevTime => Math.max(0, prevTime - 1));
