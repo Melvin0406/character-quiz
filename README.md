@@ -1,50 +1,12 @@
-# Welcome to your Expo app 👋
-
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
-## Get started
+This app is being developed using Expo, React Native and Firebase. It is intended to be an app with a concentration of games to play with your friends, like mimic a character, show quizzes and more.
 
-1. Install dependencies
+This is the log in app, where the user will be stored using Firebase.
+![Untitled](https://github.com/user-attachments/assets/f4df7deb-19e1-41b6-b6a2-672ef8d2b5c0)
 
-   ```bash
-   npm install
-   ```
+In this section, you can select characters from the shows you have watched. This will create a list for the user to play the games. This list will be stored using Firestore database.
+![Untitled](https://github.com/user-attachments/assets/4ac16204-5190-4d9d-a936-168b54d73609)
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This is the current game in development, where a character from the user's list will appear for him to mimic. 
+![Untitled-1](https://github.com/user-attachments/assets/60687486-774f-48b3-a76f-8bd067d1366f)
