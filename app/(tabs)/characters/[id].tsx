@@ -1,3 +1,4 @@
+// /app/(tabs)/characters/[id].tsx 
 import Checkbox from 'expo-checkbox';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useState } from 'react';

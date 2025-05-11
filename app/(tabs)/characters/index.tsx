@@ -1,3 +1,4 @@
+// /app/(tabs)/characters/index.tsx 
 import { JikanClient } from '@tutkli/jikan-ts';
 import Checkbox from 'expo-checkbox';
 import { useRouter } from 'expo-router';
@@ -153,65 +154,16 @@ export default function AnimeListScreen() {
   };
   // --- FIN NUEVAS FUNCIONES HANDLER ---
 
-  const renderContent = () => {
-    // Priorizar el loader del contexto si está cargando datos de AsyncStorage
-    if (isSelectionLoading || loadingList) { 
-      return (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#666" />
-        </View>
-      );
+  const renderPaginationControls = () => {
+    if (!(!loadingList && (lastPage && lastPage > 1))) { // Misma condición que antes para mostrar paginación
+        return null;
     }
-    if (animesFromApi.length === 0 && debouncedQuery) {
-      return (
-        <View style={styles.centered}>
-          <Text>No se encontraron animes para "{debouncedQuery}".</Text>
-        </View>
-      );
-    }
-    if (animesFromApi.length === 0 && !debouncedQuery) {
-        return (
-          <View style={styles.centered}>
-            <Text>No hay animes para mostrar. Revisa tu conexión o intenta más tarde.</Text>
-          </View>
-        );
-      }
     return (
-      <FlatList
-        data={animesFromApi}
-        keyExtractor={(item) => item.mal_id.toString()}
-        renderItem={renderAnimeItem}
-        contentContainerStyle={styles.list}
-      />
-    );
-  };
-
-  return (
-    <View style={styles.outerContainer}>
-      {/* --- INPUT DE BÚSQUEDA MODIFICADO --- */}
-      <View style={styles.searchSection}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar anime..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          returnKeyType="search"
-          onSubmitEditing={() => fetchAnimesFromApi(1, searchQuery)} // Opcional: buscar al presionar enter en teclado
-        />
-        {searchQuery.length > 0 && (
-          <Pressable onPress={handleClearSearch} style={styles.clearButton}>
-            <FontAwesome name="times-circle" size={20} color="#888" />
-          </Pressable>
-        )}
-      </View>
-      {renderContent()}
-      {/* Solo mostrar paginación si no está cargando y hay más de una página posible o estamos en una página > 1 */}
-      {!loadingList && (lastPage && lastPage > 1) && (
         <View style={styles.paginationContainer}>
           <View style={styles.paginationMainControls}>
             <Pressable
               disabled={page === 1 || loadingList} 
-              onPress={goToFirstPage} // Ir a la primera página
+              onPress={goToFirstPage}
               style={[styles.pageButton, (page === 1 || loadingList) && styles.disabledButton]}
             >
               <FontAwesome name="angle-double-left" size={18} color={page === 1 || loadingList ? "#ccc" : "#007AFF"} />
@@ -223,9 +175,7 @@ export default function AnimeListScreen() {
             >
               <FontAwesome name="angle-left" size={18} color={page === 1 || loadingList ? "#ccc" : "#007AFF"} />
             </Pressable>
-            
             <Text style={styles.pageNumberText}>Página {page} de {lastPage || '...'}</Text>
-            
             <Pressable
               disabled={loadingList || (lastPage !== null && page >= lastPage)}
               onPress={() => { if (!loadingList) setPage((prev) => prev + 1); }}
@@ -248,7 +198,7 @@ export default function AnimeListScreen() {
               onChangeText={setTargetPageInput}
               placeholder="Ir a..."
               keyboardType="number-pad"
-              onSubmitEditing={handleGoToPage} // Buscar al presionar enter del teclado
+              onSubmitEditing={handleGoToPage}
               returnKeyType="go"
             />
             <Pressable onPress={handleGoToPage} style={styles.goButton}>
@@ -256,8 +206,65 @@ export default function AnimeListScreen() {
             </Pressable>
           </View>
         </View> 
-      )}
-      {/* --- FIN PAGINACIÓN MODIFICADA --- */}
+    );
+  };
+  
+  const renderContent = () => {
+    // Priorizar el loader del contexto si está cargando datos de AsyncStorage
+    if (isSelectionLoading || (loadingList && animesFromApi.length === 0)) { 
+      return (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#666" />
+        </View>
+      );
+    }
+    if (animesFromApi.length === 0 && debouncedQuery) {
+      return (
+        <View style={styles.centered}>
+          <Text>No se encontraron animes para "{debouncedQuery}".</Text>
+        </View>
+      );
+    }
+    if (animesFromApi.length === 0 && !debouncedQuery && !loadingList) {
+        return (
+          <View style={styles.centered}>
+            <Text>No hay animes para mostrar. Revisa tu conexión o intenta más tarde.</Text>
+          </View>
+        );
+      }
+      return (
+        <FlatList
+          data={animesFromApi}
+          keyExtractor={(item) => item.mal_id.toString()}
+          renderItem={renderAnimeItem}
+          contentContainerStyle={styles.list}
+          // onEndReached={() => setShowPagination(true)} // Opción 1: activar al llegar al final
+          // onEndReachedThreshold={0.1}
+          // ListFooterComponent={showPagination ? renderPaginationControls() : (loadingList ? <ActivityIndicator /> : null)} // Opción 1
+          ListFooterComponent={renderPaginationControls} // Opción 2: Siempre como footer
+        />
+      );
+    };
+
+  return (
+    <View style={styles.outerContainer}>
+      {/* --- INPUT DE BÚSQUEDA MODIFICADO --- */}
+      <View style={styles.searchSection}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar anime..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          onSubmitEditing={() => fetchAnimesFromApi(1, searchQuery)} // Opcional: buscar al presionar enter en teclado
+        />
+        {searchQuery.length > 0 && (
+          <Pressable onPress={handleClearSearch} style={styles.clearButton}>
+            <FontAwesome name="times-circle" size={20} color="#888" />
+          </Pressable>
+        )}
+      </View>
+      {renderContent()}
     </View>
   );
 }
