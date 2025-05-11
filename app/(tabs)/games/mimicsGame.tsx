@@ -1,6 +1,7 @@
 // /app/(tabs)/games/mimicsGame.tsx
 import FastImage from '@d11/react-native-fast-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -21,6 +22,7 @@ interface GameCharacter {
 export default function MimicsGameScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const navigation = useNavigation();
 
   const [participants, setParticipants] = useState<GameParticipant[]>([]);
   const [characterListForGame, setCharacterListForGame] = useState<GameCharacter[]>([]); // Lista original de la sesión
@@ -36,6 +38,39 @@ export default function MimicsGameScreen() {
   const [gamePhase, setGamePhase] = useState<'loading' | 'prepare' | 'acting' | 'scoring' | 'gameOver'>('loading');
   const [isScoringModalVisible, setIsScoringModalVisible] = useState(false);
 
+
+  // --- LÓGICA PARA OCULTAR/MOSTRAR LA BARRA DE PESTAÑAS ---
+  useFocusEffect(
+    useCallback(() => {
+      // Intenta obtener el navegador padre (el de las pestañas)
+      const parentNavigator = navigation.getParent();
+
+      if (parentNavigator) {
+        // Ocultar la barra de pestañas cuando esta pantalla está en foco
+        console.log("MimicsGameScreen focused, hiding tab bar.");
+        parentNavigator.setOptions({
+          tabBarStyle: { display: 'none' },
+          // Si estás usando tabBarVisible (más antiguo):
+          // tabBarVisible: false, 
+        });
+      }
+
+      // Función de limpieza: se ejecuta cuando la pantalla pierde el foco
+      return () => {
+        if (parentNavigator) {
+          // Restaurar la barra de pestañas cuando se sale de esta pantalla
+          console.log("MimicsGameScreen unfocused, showing tab bar.");
+          parentNavigator.setOptions({
+            tabBarStyle: { display: 'flex' }, // O tu estilo por defecto, o undefined
+            // Si usaste tabBarVisible:
+            // tabBarVisible: true,
+          });
+        }
+      };
+    }, [navigation]) // La dependencia es navigation
+  );
+  // --- FIN DE LÓGICA PARA OCULTAR/MOSTRAR BARRA DE PESTAÑAS ---
+  
   // Cargar participantes y lista de personajes
   useEffect(() => {
     let mounted = true;
