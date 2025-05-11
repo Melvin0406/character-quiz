@@ -1,12 +1,22 @@
 // context/AuthContext.tsx
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native'; // Import loading indicator
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+// PASO 1: Importar funciones modulares Y el namespace de tipos
+import type { FirebaseAuthTypes } from '@react-native-firebase/auth'; // <-- Importar el namespace de tipos así
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from '@react-native-firebase/auth';
+
+const rnfbAuth = getAuth(); 
 
 interface AuthContextType {
-  user: FirebaseAuthTypes.User | null;
+  user: FirebaseAuthTypes.User | null; // PASO 2: Usar FirebaseAuthTypes.User
   initializing: boolean; 
-  // Add functions
   login: (email: string, pass: string) => Promise<void>;
   signup: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -16,54 +26,48 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [initializing, setInitializing] = useState(true);
-  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null); // PASO 2: Usar FirebaseAuthTypes.User
 
-  function onAuthStateChanged(userState: FirebaseAuthTypes.User | null) {
+  function handleAuthStateChanged(userState: FirebaseAuthTypes.User | null) { // PASO 2: Usar FirebaseAuthTypes.User
     setUser(userState);
     if (initializing) {
       setInitializing(false);
     }
-    console.log('Auth State Changed, User:', userState?.uid || null); 
+    console.log('Auth State Changed (Modular), User:', userState?.uid || null); 
   }
 
   useEffect(() => {
-    const subscriber = auth().onAuthStateChanged(onAuthStateChanged);
+    const subscriber = onAuthStateChanged(rnfbAuth, handleAuthStateChanged);
     return subscriber; 
   }, []);
 
-  // --- Authentication Functions ---
   const login = async (email: string, pass: string) => {
     try {
-      await auth().signInWithEmailAndPassword(email, pass);
+      await signInWithEmailAndPassword(rnfbAuth, email, pass);
     } catch (error: any) {
-      console.error('Login failed:', error);
-      // Re-throw the error so UI can handle specific codes
+      console.error('Login failed (Modular):', error);
       throw error; 
     }
   };
 
   const signup = async (email: string, pass: string) => {
     try {
-      await auth().createUserWithEmailAndPassword(email, pass);
+      await createUserWithEmailAndPassword(rnfbAuth, email, pass);
     } catch (error: any) {
-      console.error('Signup failed:', error);
+      console.error('Signup failed (Modular):', error);
       throw error;
     }
   };
 
   const logout = async () => {
     try {
-      await auth().signOut();
-      // setUser(null) will be handled by onAuthStateChanged listener
-    } catch (error) {
-      console.error('Logout failed:', error);
+      await signOut(rnfbAuth);
+    } catch (error: any) {
+      console.error('Logout failed (Modular):', error);
       throw error;
     }
   };
-  // --- End Authentication Functions ---
 
-
-  // Optionally show loading screen while Firebase initializes
   if (initializing) {
     return (
       <View style={styles.loadingContainer}>
@@ -77,7 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{ 
         user, 
         initializing, 
-        login, // Expose functions
+        login,
         signup,
         logout 
       }}
@@ -95,7 +99,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Add styles for loading container
 const styles = StyleSheet.create({
     loadingContainer: {
         flex: 1,
