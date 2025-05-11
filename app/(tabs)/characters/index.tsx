@@ -2,7 +2,7 @@
 import { JikanClient } from '@tutkli/jikan-ts';
 import Checkbox from 'expo-checkbox';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 // Asegúrate que la ruta al contexto es correcta
 import FastImage from '@d11/react-native-fast-image';
@@ -35,6 +35,8 @@ export default function AnimeListScreen() {
   const [targetPageInput, setTargetPageInput] = useState<string>('');
 
   const router = useRouter();
+  const flatListRef = useRef<FlatList<ApiAnimeResponse>>(null);
+
   // isLoading del contexto es para la carga inicial de AsyncStorage
   const { handleAnimeCheckboxToggle, isAnimeSelected, isLoading: isSelectionLoading } = useSelection();
 
@@ -86,6 +88,18 @@ export default function AnimeListScreen() {
     }
   }, [page, debouncedQuery, isSelectionLoading]); // Añadir isSelectionLoading como dependencia
 
+  useEffect(() => {
+    if (flatListRef.current) {
+      // Usamos un pequeño timeout para dar tiempo a que la FlatList
+      // potencialmente se actualice con los nuevos datos de la página
+      // antes de intentar hacer scroll.
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 100); // 100ms es un retraso común, puedes ajustarlo.
+  
+      return () => clearTimeout(timer); // Limpiar el timer si el componente se desmonta o page cambia de nuevo
+    }
+  }, [page]);
 
   const renderAnimeItem = ({ item }: { item: ApiAnimeResponse }) => {
     const isSelected = isAnimeSelected(item.mal_id);
@@ -210,41 +224,57 @@ export default function AnimeListScreen() {
   };
   
   const renderContent = () => {
-    // Priorizar el loader del contexto si está cargando datos de AsyncStorage
-    if (isSelectionLoading || (loadingList && animesFromApi.length === 0)) { 
+    // Prioridad 1: Si el contexto de selección global está cargando
+    if (isSelectionLoading) { 
       return (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#666" />
+          <ActivityIndicator size="large" color="#007AFF" /> 
+          <Text style={styles.loadingText}>Cargando selecciones...</Text>
         </View>
       );
     }
-    if (animesFromApi.length === 0 && debouncedQuery) {
+
+    // Prioridad 2: Si la lista de animes para la página actual se está cargando
+    // Esto cubrirá la carga inicial de la primera página Y las transiciones entre páginas.
+    if (loadingList) { 
       return (
         <View style={styles.centered}>
-          <Text>No se encontraron animes para "{debouncedQuery}".</Text>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Buscando animes...</Text>
         </View>
       );
     }
-    if (animesFromApi.length === 0 && !debouncedQuery && !loadingList) {
+
+    // Si llegamos aquí, no hay carga activa (ni de contexto ni de lista).
+    // Ahora mostramos la lista o mensajes de "no hay resultados".
+    if (animesFromApi.length === 0) { // Si no hay animes que mostrar
+      if (debouncedQuery) { // Y fue por una búsqueda
+        return (
+          <View style={styles.centered}>
+            <Text>No se encontraron animes para "{debouncedQuery}".</Text>
+          </View>
+        );
+      } else { // Y no fue por una búsqueda (ej. error de API o realmente no hay nada)
         return (
           <View style={styles.centered}>
             <Text>No hay animes para mostrar. Revisa tu conexión o intenta más tarde.</Text>
           </View>
         );
       }
-      return (
-        <FlatList
-          data={animesFromApi}
-          keyExtractor={(item) => item.mal_id.toString()}
-          renderItem={renderAnimeItem}
-          contentContainerStyle={styles.list}
-          // onEndReached={() => setShowPagination(true)} // Opción 1: activar al llegar al final
-          // onEndReachedThreshold={0.1}
-          // ListFooterComponent={showPagination ? renderPaginationControls() : (loadingList ? <ActivityIndicator /> : null)} // Opción 1
-          ListFooterComponent={renderPaginationControls} // Opción 2: Siempre como footer
-        />
-      );
-    };
+    }
+    
+    // Si hay animes y no estamos cargando, mostrar la FlatList
+    return (
+      <FlatList
+        ref={flatListRef} // Mantener la ref para el scroll
+        data={animesFromApi}
+        keyExtractor={(item) => item.mal_id.toString()}
+        renderItem={renderAnimeItem}
+        contentContainerStyle={styles.list}
+        ListFooterComponent={renderPaginationControls} // Solo los controles de paginación como footer
+      />
+    );
+  };
 
   return (
     <View style={styles.outerContainer}>

@@ -39,6 +39,19 @@ export default function MyListScreen() {
   const [lastToggledAnime, setLastToggledAnime] = useState<MyListAnime | null>(null);
   const [lastActionWasDeselect, setLastActionWasDeselect] = useState(false);
   const undoTimerRef = useRef<number | null>(null);
+    const flatListRef = useRef<FlatList<MyListAnime>>(null);
+    
+    useEffect(() => {
+        if (flatListRef.current && displayedAnimes.length > 0) {
+
+           const timer = setTimeout(() => {
+             if (flatListRef.current) { // Checar de nuevo por si se desmontó
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+             }
+           }, 100); 
+           return () => clearTimeout(timer);
+        }
+      }, [page]);
 
   // Construir la lista para la sesión actual de la pantalla
   // (Esta función se llama en useFocusEffect)
@@ -233,6 +246,7 @@ export default function MyListScreen() {
     }
     return (
       <FlatList
+        ref={flatListRef}
         data={displayedAnimes}
         keyExtractor={(item) => item.mal_id.toString()}
         renderItem={renderAnimeItem}
