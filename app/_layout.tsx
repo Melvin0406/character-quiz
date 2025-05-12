@@ -37,8 +37,7 @@ const InitialLayout = () => {
           // Pero si accidentalmente llega aquí (ej. por URL directa y no hay user), lo mandamos a home.
           // O, si queremos que pueda ver login/signup para salir de invitado, no hacemos nada aquí.
           // Por ahora, si es invitado y está en (auth), lo mandamos a home.
-          console.log("InitialLayout: Guest is in auth group, redirecting to /home as guest.");
-          router.replace('/home'); 
+          console.log("InitialLayout: Guest is in auth group, redirecting to /home as guest."); 
         } else {
           console.log("InitialLayout: User is guest, staying in main app flow.");
           // No hacer nada, ya está en el flujo correcto como invitado

@@ -18,7 +18,14 @@ export default function TabLayout() {
         tabBarActiveTintColor: 'blue', // Elige tu color activo
         headerShown: false, // Descomentar para que cada stack maneje su propio header
       }}>
-      <Tabs.Screen name="home" options={{ title: 'Inicio' }} />
+      <Tabs.Screen
+        name="home" // Asumo que tienes una pestaña home
+        options={{
+          title: 'Inicio',
+          headerShown: false, // Para que el layout de home maneje su header
+          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+        }}
+      />
       <Tabs.Screen
         name="characters" // Pestaña de personajes/animes
         options={{
@@ -35,7 +42,14 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="gamepad" color={color} />,
         }}
       />
-      <Tabs.Screen name="settings" options={{ title: 'Ajustes' }} />
+      <Tabs.Screen
+        name="settings" // Este nombre debe coincidir con la carpeta /app/(tabs)/settings/
+        options={{
+          title: 'Ajustes',
+          headerShown: false, // Dejamos que el Stack dentro de "settings" maneje su propio header
+          tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
