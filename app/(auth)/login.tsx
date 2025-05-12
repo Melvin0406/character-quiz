@@ -2,13 +2,13 @@
 import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useAuth } from '../../context/AuthContext'; // Adjust path if needed
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth(); // Get login function from context
+  const { login, enterGuestMode } = useAuth();
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -40,6 +40,21 @@ export default function LoginScreen() {
     }
   };
 
+  const handleContinueAsGuest = async () => {
+    setLoading(true); // Mostrar un feedback visual breve
+    try {
+      await enterGuestMode();
+      // Después de entrar en modo invitado, InitialLayout debería permitir el acceso a /home
+      // y como user es null pero isGuest es true, no debería redirigir de vuelta aquí.
+      router.replace('/home'); // O la ruta principal de tu app, ej. '/characters'
+    } catch (error) {
+      console.error("Error entering guest mode:", error);
+      Alert.alert("Error", "No se pudo continuar como invitado.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Iniciar Sesión</Text>
@@ -61,15 +76,21 @@ export default function LoginScreen() {
       />
 
       {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={styles.button} />
+        <ActivityIndicator size="large" color="#007AFF" style={styles.buttonPlaceholder} />
       ) : (
-        <Pressable style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Entrar</Text>
-        </Pressable>
+        <>
+          <Pressable style={styles.button} onPress={handleLogin}>
+            <Text style={styles.buttonText}>Entrar</Text>
+          </Pressable>
+          {/* --- BOTÓN CONTINUAR COMO INVITADO --- */}
+          <Pressable style={[styles.button, styles.guestButton]} onPress={handleContinueAsGuest}>
+            <Text style={styles.buttonText}>Continuar como Invitado</Text>
+          </Pressable>
+        </>
       )}
 
       <Link href="/(auth)/signup" asChild>
-        <Pressable style={styles.linkButton}>
+        <Pressable style={styles.linkButton} disabled={loading}>
           <Text style={styles.linkText}>¿No tienes cuenta? Regístrate</Text>
         </Pressable>
       </Link>
@@ -123,5 +144,15 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#007AFF',
     fontSize: 16,
+  },
+  buttonPlaceholder: { // Estilo para el ActivityIndicator cuando reemplaza botones
+    height: 110, // Aproximadamente la altura de dos botones + margen
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  guestButton: {
+    backgroundColor: '#555', // Un color diferente para el botón de invitado
+    marginTop: 10, // Espacio entre botones si no está loading
   },
 });
