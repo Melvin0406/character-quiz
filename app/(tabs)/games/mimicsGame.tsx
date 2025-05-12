@@ -51,7 +51,6 @@ export default function MimicsGameScreen() {
 
       if (parentNavigator) {
         // Ocultar la barra de pestañas cuando esta pantalla está en foco
-        console.log("MimicsGameScreen focused, hiding tab bar.");
         parentNavigator.setOptions({
           tabBarStyle: { display: 'none' },
           // Si estás usando tabBarVisible (más antiguo):
@@ -63,7 +62,6 @@ export default function MimicsGameScreen() {
       return () => {
         if (parentNavigator) {
           // Restaurar la barra de pestañas cuando se sale de esta pantalla
-          console.log("MimicsGameScreen unfocused, showing tab bar.");
           parentNavigator.setOptions({
             tabBarStyle: { display: 'flex' }, // O tu estilo por defecto, o undefined
             // Si usaste tabBarVisible:
@@ -143,7 +141,6 @@ export default function MimicsGameScreen() {
   const selectRandomCharacter = useCallback(() => {
     if (availableCharacters.length === 0) {
       // ¡YA NO HAY PERSONAJES ÚNICOS DISPONIBLES EN ESTA SESIÓN!
-      console.log("Todos los personajes de la lista se han usado en esta sesión.");
       return null; // Indicar que no hay más personajes
     }
 
@@ -153,13 +150,11 @@ export default function MimicsGameScreen() {
     // Eliminar el personaje seleccionado de la lista de disponibles
     setAvailableCharacters(prev => prev.filter(char => char.mal_id !== selected.mal_id));
     
-    console.log(`Personaje seleccionado: ${selected.name}. Restantes disponibles: ${availableCharacters.length - 1}`);
     return selected;
   }, [availableCharacters]); // Solo depende de availableCharacters
 
 
   const prepareNextTurn = useCallback(() => {
-    console.log(`MimicsGame: prepareNextTurn INICIO. currentRound=${round}, currentActorIdx=${currentActorIndex}`);
     if (participants.length === 0) {
       console.error("prepareNextTurn: No hay participantes.");
       setGameOverMessage("Error: No hay participantes.");
@@ -179,20 +174,16 @@ export default function MimicsGameScreen() {
     if (round === 0) { // Configuración del PRIMER turno del juego
       newActorIdx = 0;    // El primer actor es el del índice 0
       newRound = 1;       // Esta será la Ronda 1
-      console.log(`prepareNextTurn: Configurando primer turno. Actor: ${participants[newActorIdx]?.name}, Ronda: ${newRound}`);
     } else { // Para turnos subsecuentes
       newActorIdx = (currentActorIndex + 1) % participants.length;
       if (newActorIdx === 0) { // Se completó una vuelta, empieza una nueva ronda
         newRound = round + 1;
-        console.log(`prepareNextTurn: Nueva ronda completa. Próximo actor: ${participants[newActorIdx]?.name}, Nueva Ronda: ${newRound}`);
       } else {
-        console.log(`prepareNextTurn: Siguiente actor en la misma ronda. Próximo actor: ${participants[newActorIdx]?.name}, Ronda: ${newRound}`);
       }
     }
 
     // Verificar si el juego terminó por rondas ANTES de seleccionar personaje
     if (totalRounds > 0 && newRound > totalRounds) {
-      console.log(`prepareNextTurn: Fin del juego por rondas. Se iba a iniciar la ronda ${newRound} (límite ${totalRounds}).`);
       setGameOverMessage(`¡Se completaron las ${totalRounds} rondas!`);
       setGamePhase('gameOver');
       return;
@@ -200,7 +191,6 @@ export default function MimicsGameScreen() {
     
     const selectedChar = selectRandomCharacter();
     if (!selectedChar) {
-      console.log("prepareNextTurn: Fin del juego, no hay más personajes únicos.");
       setGameOverMessage("¡Se han usado todos los personajes de la lista!");
       setGamePhase('gameOver');
       setCurrentCharacter(null);
@@ -221,7 +211,6 @@ export default function MimicsGameScreen() {
   // useEffect para iniciar/continuar turnos cuando gamePhase es 'prepare'
   useEffect(() => {
     if (gamePhase === 'prepare' && participants.length > 0 && characterListForGame.length > 0) {
-      console.log(`MimicsGame: useEffect[gamePhase] -> gamePhase es 'prepare'. Llamando a prepareNextTurn.`);
       console.log(`           Valores antes de prepareNextTurn: round=${round}, currentActorIndex=${currentActorIndex}`);
       prepareNextTurn(); 
     }
@@ -254,7 +243,6 @@ export default function MimicsGameScreen() {
           return p;
         })
       );
-      console.log(`+1 punto para ${currentActor.name} (actor) y ${guesserName} (adivinador).`);
     } else {
       console.log("Nadie adivinó esta ronda o no se seleccionó adivinador.");
     }
