@@ -37,7 +37,11 @@ export default function MimicsGameScreen() {
   // Añadimos 'gameOver' al gamePhase
   const [gamePhase, setGamePhase] = useState<'loading' | 'prepare' | 'acting' | 'scoring' | 'gameOver'>('loading');
   const [isScoringModalVisible, setIsScoringModalVisible] = useState(false);
+  const [gameOverMessage, setGameOverMessage] = useState(''); // Para el mensaje de fin de juego
 
+  // --- ESTADOS PARA CONFIGURACIÓN DEL JUEGO (recibidos de params) ---
+  const [timePerRound, setTimePerRound] = useState(90); // Valor por defecto
+  const [totalRounds, setTotalRounds] = useState(0); // 0 para ilimitado, valor por defecto
 
   // --- LÓGICA PARA OCULTAR/MOSTRAR LA BARRA DE PESTAÑAS ---
   useFocusEffect(
@@ -77,6 +81,8 @@ export default function MimicsGameScreen() {
     setGamePhase('loading');
     let parsedParticipants: GameParticipant[] = [];
     let parsedCharacterList: GameCharacter[] = [];
+    let parsedNumberOfRounds = 0;
+    let parsedTimePerRound = 90;
 
     // ... (lógica de parseo de params.participants sin cambios) ...
     if (params.participants) {
@@ -111,23 +117,28 @@ export default function MimicsGameScreen() {
       if (mounted) Alert.alert("Error", "No se recibió la lista de personajes.", [{ text: "OK", onPress: () => router.replace('/games/mimicsGameSetup') }]);
       return;
     }
+
+    // --- PARSEAR NUEVAS CONFIGURACIONES ---
+    if (params.numberOfRounds) {
+      parsedNumberOfRounds = parseInt(params.numberOfRounds as string, 10);
+      if (isNaN(parsedNumberOfRounds) || parsedNumberOfRounds < 0) parsedNumberOfRounds = 0; // Default a ilimitado si es inválido
+    }
+    if (params.timePerRound) {
+      parsedTimePerRound = parseInt(params.timePerRound as string, 10);
+      if (isNaN(parsedTimePerRound) || parsedTimePerRound < 30) parsedTimePerRound = 90; // Default a 90s si es inválido o menor a 30s
+    }
     
     if (mounted) {
         setParticipants(parsedParticipants);
-        setCharacterListForGame(parsedCharacterList); // Guardar la lista original
-        setAvailableCharacters([...parsedCharacterList]); // Copiar para la lista de disponibles
+        setCharacterListForGame(parsedCharacterList);
+        setAvailableCharacters([...parsedCharacterList]);
+        setTotalRounds(parsedNumberOfRounds); // Guardar número total de rondas
+        setTimePerRound(parsedTimePerRound); // Guardar tiempo por ronda
+        setTimeLeft(parsedTimePerRound);     // Establecer tiempo inicial para el primer turno
         setGamePhase('prepare');
     }
     return () => { mounted = false; }
-  }, [params.participants, params.characterList]);
-
-  // Iniciar el primer turno
-  useEffect(() => {
-    if (gamePhase === 'prepare' && participants.length > 0 && characterListForGame.length > 0) {
-      prepareNextTurn(); 
-    }
-  }, [gamePhase, participants, characterListForGame]); // Añadir prepareNextTurn a dependencias
-
+  }, [params.participants, params.characterList, params.numberOfRounds, params.timePerRound, router]); // Añadido router a dependencias
 
   const selectRandomCharacter = useCallback(() => {
     if (availableCharacters.length === 0) {
@@ -148,65 +159,73 @@ export default function MimicsGameScreen() {
 
 
   const prepareNextTurn = useCallback(() => {
+    console.log(`MimicsGame: prepareNextTurn INICIO. currentRound=${round}, currentActorIdx=${currentActorIndex}`);
     if (participants.length === 0) {
-      console.log("No hay participantes.");
-      setGamePhase('gameOver'); // No se puede continuar
+      console.error("prepareNextTurn: No hay participantes.");
+      setGameOverMessage("Error: No hay participantes.");
+      setGamePhase('gameOver');
       return;
     }
-    // characterListForGame se usa para verificar si el juego puede siquiera empezar, 
-    // pero la selección se hace de availableCharacters
     if (characterListForGame.length === 0) {
-        console.log("La lista original de personajes está vacía.");
-        setGamePhase('gameOver');
-        return;
+      console.error("prepareNextTurn: Lista de personajes original vacía.");
+      setGameOverMessage("Error: No hay personajes en la lista del juego.");
+      setGamePhase('gameOver');
+      return;
+    }
+
+    let newActorIdx;
+    let newRound = round;
+
+    if (round === 0) { // Configuración del PRIMER turno del juego
+      newActorIdx = 0;    // El primer actor es el del índice 0
+      newRound = 1;       // Esta será la Ronda 1
+      console.log(`prepareNextTurn: Configurando primer turno. Actor: ${participants[newActorIdx]?.name}, Ronda: ${newRound}`);
+    } else { // Para turnos subsecuentes
+      newActorIdx = (currentActorIndex + 1) % participants.length;
+      if (newActorIdx === 0) { // Se completó una vuelta, empieza una nueva ronda
+        newRound = round + 1;
+        console.log(`prepareNextTurn: Nueva ronda completa. Próximo actor: ${participants[newActorIdx]?.name}, Nueva Ronda: ${newRound}`);
+      } else {
+        console.log(`prepareNextTurn: Siguiente actor en la misma ronda. Próximo actor: ${participants[newActorIdx]?.name}, Ronda: ${newRound}`);
+      }
+    }
+
+    // Verificar si el juego terminó por rondas ANTES de seleccionar personaje
+    if (totalRounds > 0 && newRound > totalRounds) {
+      console.log(`prepareNextTurn: Fin del juego por rondas. Se iba a iniciar la ronda ${newRound} (límite ${totalRounds}).`);
+      setGameOverMessage(`¡Se completaron las ${totalRounds} rondas!`);
+      setGamePhase('gameOver');
+      return;
     }
     
     const selectedChar = selectRandomCharacter();
-
     if (!selectedChar) {
-        // No hay más personajes únicos disponibles
-        Alert.alert(
-            "¡Fin de los Personajes!", 
-            "Se han usado todos los personajes de tu lista en esta sesión. El juego ha terminado.",
-            // Permitir ver puntuaciones finales o salir.
-            [{ text: "Ver Puntuaciones y Salir", onPress: () => setGamePhase('gameOver') }] 
-        );
-        setCurrentCharacter(null); // Limpiar personaje actual
-        setIsTimerRunning(false); // Detener cualquier temporizador
-        // No necesariamente se sale aquí, se cambia el estado a gameOver para mostrar UI adecuada
-        return;
+      console.log("prepareNextTurn: Fin del juego, no hay más personajes únicos.");
+      setGameOverMessage("¡Se han usado todos los personajes de la lista!");
+      setGamePhase('gameOver');
+      setCurrentCharacter(null);
+      setIsTimerRunning(false);
+      return;
     }
 
     setCurrentCharacter(selectedChar);
-    
-    const newActorIndex = (currentActorIndex + 1) % participants.length;
-    
-    if (newActorIndex === 0 && round > 0) { // Solo incrementar ronda si ya hubo al menos una y se completó un ciclo
-      setRound(prev => prev + 1);
-    } else if (round === 0) { // Primera configuración de turno
-      setRound(1); // Inicia la ronda 1
-      // setCurrentActorIndex(0) implícitamente ya es el primer actor si currentActorIndex empezó en -1 o similar
-      // o si lo manejamos aquí directamente:
-      // setCurrentActorIndex(0); // Asegurar que el primer actor es el índice 0
-    }
-    // Si currentActorIndex es 0 y round es 0, es el setup inicial del primer turno.
-    // La primera vez que prepareNextTurn es llamado desde useEffect (gamePhase 'prepare'), round es 0.
-    // Se establece a 1. currentActorIndex se pone a 0.
-    
-    // Para la primera llamada, currentActorIndex podría ser 0 (o -1 y luego +1 % N = 0).
-    // Si currentActorIndex es 0 y round es 0, el `if (newActorIndex === 0 && round > 0)` no se cumple.
-    // El `else if (round === 0)` sí. La ronda se pone a 1.
-    
-    // Si ya estamos en juego (round > 0), el actor rota.
-    // Si currentActorIndex era el último (N-1), newActorIndex será 0. Entonces se incrementa la ronda.
-    setCurrentActorIndex(newActorIndex);
+    setRound(newRound);
+    setCurrentActorIndex(newActorIdx);
 
     setIsCharacterRevealed(false);
     setIsTimerRunning(false);
-    setTimeLeft(90);
+    setTimeLeft(timePerRound); // Usar el tiempo configurado
     setGamePhase('acting');
-  }, [participants, characterListForGame, selectRandomCharacter, currentActorIndex, round, router]);
+  }, [participants, characterListForGame, selectRandomCharacter, currentActorIndex, round, totalRounds, timePerRound]);
 
+  // useEffect para iniciar/continuar turnos cuando gamePhase es 'prepare'
+  useEffect(() => {
+    if (gamePhase === 'prepare' && participants.length > 0 && characterListForGame.length > 0) {
+      console.log(`MimicsGame: useEffect[gamePhase] -> gamePhase es 'prepare'. Llamando a prepareNextTurn.`);
+      console.log(`           Valores antes de prepareNextTurn: round=${round}, currentActorIndex=${currentActorIndex}`);
+      prepareNextTurn(); 
+    }
+  }, [gamePhase, prepareNextTurn, participants, characterListForGame]); // Mantener participants y characterListForGame por la guarda
 
   const handleRevealAndStart = () => {
     if (!currentCharacter) {
@@ -283,35 +302,34 @@ export default function MimicsGameScreen() {
     );
   }
 
+  // --- NUEVA PANTALLA DE FIN DE JUEGO ---
   if (gamePhase === 'gameOver') {
     return (
         <View style={styles.centered}>
             <Text style={styles.gameOverTitle}>¡Juego Terminado!</Text>
-            {currentCharacter === null && <Text style={styles.gameOverSubtitle}>Se han usado todos los personajes disponibles.</Text>}
+            {gameOverMessage && <Text style={styles.gameOverSubtitle}>{gameOverMessage}</Text>}
             
-            <View style={styles.scoreboard}>
+            <View style={styles.scoreboardSection}>
                 <Text style={styles.scoreboardTitle}>Puntuaciones Finales</Text>
-                {participants.map((p, index) => (
-                <Text key={p.name + index} style={styles.scoreEntry}>
-                    {p.name}: {p.score}
+                {participants.sort((a,b) => b.score - a.score).map((p, index) => ( // Ordenar por puntaje
+                <Text key={p.name + index} style={[styles.scoreEntry, index === 0 && styles.winnerScore]}> {/* Resaltar ganador */}
+                    {index + 1}. {p.name}: {p.score} {index === 0 && p.score > 0 && "🏆"}
                 </Text>
                 ))}
             </View>
 
             <View style={styles.gameOverActions}>
                 <Pressable 
-                    style={[styles.gameButton, {backgroundColor: '#5cb85c', marginBottom:10}]} 
+                    style={[styles.gameButton, {backgroundColor: '#5cb85c', marginBottom:15}]} 
                     onPress={() => {
-                        // Reiniciar estados para un nuevo juego con los mismos participantes/personajes (si se desea)
-                        // O simplemente volver al setup para que se recarguen.
-                        router.replace('/games/mimicsGameSetup');
+                        router.replace('/games/mimicsGameSetup'); // Volver al setup
                     }}
                 >
-                    <Text style={styles.gameButtonText}>Jugar de Nuevo (Setup)</Text>
+                    <Text style={styles.gameButtonText}>Jugar de Nuevo</Text>
                 </Pressable>
                 <Pressable 
                     style={[styles.gameButton, styles.exitButton]}
-                    onPress={() => router.replace('/games')}
+                    onPress={() => router.replace('/games')} // Volver a la lista de juegos
                 >
                     <Text style={styles.gameButtonText}>Salir a Lista de Juegos</Text>
                 </Pressable>
@@ -323,7 +341,9 @@ export default function MimicsGameScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
-      <Text style={styles.roundInfo}>Ronda: {round} - Turno de: <Text style={styles.actorNameHighlight}>{currentActor?.name || "N/A"}</Text></Text>
+      <Text style={styles.roundInfo}>
+        Ronda: {round} {totalRounds > 0 ? `/ ${totalRounds}` : '(Ilimitadas)'} - Turno de: <Text style={styles.actorNameHighlight}>{currentActor?.name || "N/A"}</Text>
+      </Text>
       
       <View style={styles.characterDisplayArea}>
         {gamePhase === 'acting' && !isCharacterRevealed && currentCharacter && ( // Asegurar que currentCharacter no sea null
@@ -450,21 +470,19 @@ export default function MimicsGameScreen() {
 // Añade estos estilos a tu StyleSheet
 const styles = StyleSheet.create({
   // ... (todos tus estilos existentes) ...
-  gameOverTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#d9534f',
-    marginBottom: 10,
-  },
-  gameOverSubtitle: {
-    fontSize: 18,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 25,
-  },
-  gameOverActions: {
-    width: '80%',
+  gameOverTitle: { fontSize: 32, fontWeight: 'bold', color: '#007AFF', marginBottom: 15, textAlign: 'center', },
+  gameOverSubtitle: { fontSize: 18, color: '#555', textAlign: 'center', marginBottom: 25, },
+  gameOverActions: { width: '90%', marginTop: 20, alignItems: 'center',},
+  scoreboardSection: { // Estilo para la sección de scoreboard en game over
+    width: '90%',
     marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  winnerScore: { // Para resaltar al ganador
+    fontWeight: 'bold',
+    color: '#28a745', // Verde
   },
   // Estilos del Modal (si no los tenías exactamente así antes)
   centeredModalView: {

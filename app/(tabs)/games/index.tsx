@@ -28,13 +28,10 @@ export default function GamesListScreen() {
     <View style={styles.container}>
       <Text style={styles.pageTitle}>Juegos Disponibles</Text>
 
-      {/* Juego de Mímica */}
       <Pressable style={styles.gameItem} onPress={() => handleGameSelect('mimicsGameSetup')}>
         <Text style={styles.gameTitle}>Mímica de Personajes</Text>
         <Text style={styles.gameDescription}>¡Actúa y que tus amigos adivinen el personaje de anime!</Text>
       </Pressable>
-
-      {/* Aquí podrías añadir más Pressable para otros juegos en el futuro */}
 
       <Modal
         animationType="slide"

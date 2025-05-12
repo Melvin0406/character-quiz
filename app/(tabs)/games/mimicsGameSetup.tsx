@@ -20,6 +20,8 @@ interface GameCharacter {
 }
 
 const MIN_CHARACTERS_TO_PLAY = 3; // Define un mínimo de personajes para jugar
+const DEFAULT_TIME_PER_ROUND = "90"; // Segundos
+const DEFAULT_NUMBER_OF_ROUNDS = "3"; // 0 o vacío para ilimitado
 
 export default function MimicsGameSetupScreen() {
   const router = useRouter();
@@ -29,6 +31,8 @@ export default function MimicsGameSetupScreen() {
   const [currentName, setCurrentName] = useState('');
   const [characterListForGame, setCharacterListForGame] = useState<GameCharacter[]>([]);
   const [isLoadingCharacters, setIsLoadingCharacters] = useState(true);
+  const [numberOfRoundsInput, setNumberOfRoundsInput] = useState<string>(DEFAULT_NUMBER_OF_ROUNDS); // 0 o vacío para ilimitadas
+  const [timePerRoundInput, setTimePerRoundInput] = useState<string>(DEFAULT_TIME_PER_ROUND); // en segundos
 
   useEffect(() => {
     if (!isSelectionContextLoading) {
@@ -93,13 +97,26 @@ export default function MimicsGameSetupScreen() {
       return;
     }
 
+    // Validar y parsear configuraciones del juego
+    const parsedRounds = parseInt(numberOfRoundsInput, 10);
+    const finalNumberOfRounds = !isNaN(parsedRounds) && parsedRounds > 0 ? parsedRounds : 0; // 0 para ilimitado
+
+    const parsedTime = parseInt(timePerRoundInput, 10);
+    const finalTimePerRound = !isNaN(parsedTime) && parsedTime >= 30 ? parsedTime : parseInt(DEFAULT_TIME_PER_ROUND, 10); // Mínimo 30s
+
+    if (isNaN(parsedTime) || parsedTime < 30) {
+        Alert.alert("Tiempo Inválido", `El tiempo por ronda debe ser de al menos 30 segundos. Se usará el valor por defecto (${DEFAULT_TIME_PER_ROUND}s).`);
+    }
+
     const gameParticipants = participants.map(p => ({ name: p.name, score: 0 }));
 
     router.push({
       pathname: '/games/mimicsGame',
       params: {
         participants: JSON.stringify(gameParticipants),
-        characterList: JSON.stringify(characterListForGame), // Pasar la lista de personajes
+        characterList: JSON.stringify(characterListForGame),
+        numberOfRounds: String(finalNumberOfRounds), // Convertir a string para params
+        timePerRound: String(finalTimePerRound),   // Convertir a string para params
       },
     });
   };
@@ -145,6 +162,30 @@ export default function MimicsGameSetupScreen() {
         ListEmptyComponent={<Text style={styles.emptyListText}>Aún no hay participantes.</Text>}
         style={styles.list}
       />
+
+      <Text style={styles.label}>Configuración del Juego:</Text>
+      <View style={styles.configItem}>
+        <Text style={styles.configLabel}>Número de Rondas (0 para ilimitado):</Text>
+        <TextInput
+          style={styles.configInput}
+          value={numberOfRoundsInput}
+          onChangeText={setNumberOfRoundsInput}
+          placeholder={DEFAULT_NUMBER_OF_ROUNDS}
+          keyboardType="number-pad"
+          returnKeyType="done"
+        />
+      </View>
+      <View style={styles.configItem}>
+        <Text style={styles.configLabel}>Tiempo por Ronda (segundos, mín. 30):</Text>
+        <TextInput
+          style={styles.configInput}
+          value={timePerRoundInput}
+          onChangeText={setTimePerRoundInput}
+          placeholder={DEFAULT_TIME_PER_ROUND}
+          keyboardType="number-pad"
+          returnKeyType="done"
+        />
+      </View>
       
       <View style={styles.infoBox}>
         {/* Icono */}
@@ -181,10 +222,31 @@ export default function MimicsGameSetupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollView: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
+  },
+  container: {
+    // flex: 1, // Quitar si se usa ScrollView para el container principal
+    padding: 20,
+    // backgroundColor: '#fff', // Mover a scrollView si es necesario
+  },
+  configItem: {
+    marginBottom: 15,
+  },
+  configLabel: {
+    fontSize: 16,
+    color: '#444',
+    marginBottom: 5,
+  },
+  configInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#f9f9f9',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    fontSize: 16,
+    borderRadius: 8,
   },
   centeredLoader: {
     flex: 1,
