@@ -1,50 +1,49 @@
 // /app/(auth)/signup.tsx
-import { Link, useRouter } from 'expo-router';
+import { Link } from 'expo-router'; // No necesitas useRouter aquí si no navegas explícitamente DESPUÉS del signup
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useAuth } from '../../context/AuthContext'; // Adjust path
+import { useAuth } from '../../context/AuthContext'; // Ajusta la ruta
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState(''); // <--- NUEVO ESTADO
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { signup } = useAuth(); // Get signup function
-  const router = useRouter();
+  const { signup, authLoading } = useAuth(); // <--- Obtener signup y authLoading
 
   const handleSignup = async () => {
-    if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Por favor, completa todos los campos.');
+    if (!email || !username.trim() || !password || !confirmPassword) { // <--- VALIDAR USERNAME
+      Alert.alert('Campos Incompletos', 'Por favor, completa todos los campos.');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden.');
+      Alert.alert('Error de Contraseña', 'Las contraseñas no coinciden.');
       return;
     }
     if (password.length < 6) {
-       Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres.');
+       Alert.alert('Contraseña Débil', 'La contraseña debe tener al menos 6 caracteres.');
        return;
     }
+    // Podrías añadir más validaciones para el username (ej. longitud)
 
-    setLoading(true);
     try {
-      await signup(email, password);
-      // Signup successful! AuthProvider's onAuthStateChanged will update user state.
-      // Root layout logic should navigate to the main app.
-      console.log('Signup successful');
+      await signup(email.trim(), password, username.trim()); // <--- PASAR USERNAME
+      // Si el signup es exitoso, onAuthStateChanged en AuthContext actualizará el estado 'user'
+      // y el componente InitialLayout en app/_layout.tsx se encargará de la redirección.
+      console.log('SignupScreen: Signup call successful.');
     } catch (error: any) {
-      console.error("Signup error:", error);
-      let errorMessage = 'Ocurrió un error al registrar la cuenta.';
+      console.error("SignupScreen: Signup error:", error);
+      let errorMessage = error.message || 'Ocurrió un error al registrar la cuenta.';
        if (error.code === 'auth/invalid-email') {
         errorMessage = 'El formato del email es inválido.';
       } else if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'Este correo electrónico ya está registrado.';
       } else if (error.code === 'auth/weak-password') {
         errorMessage = 'La contraseña es muy débil.';
+      } else if (error.code === 'auth/invalid-username') { // Usar mensaje del AuthContext
+        errorMessage = error.message; 
       }
       Alert.alert('Error de Registro', errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -52,31 +51,21 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Crear Cuenta</Text>
       
+      {/* --- NUEVO INPUT PARA USERNAME --- */}
       <TextInput
         style={styles.input}
-        placeholder="Correo Electrónico"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
+        placeholder="Nombre de Usuario"
+        value={username}
+        onChangeText={setUsername}
+        autoCapitalize="none" // Común para usernames
+        returnKeyType="next"
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Contraseña (mín. 6 caracteres)"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Confirmar Contraseña"
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        secureTextEntry
-      />
+      <TextInput style={styles.input} placeholder="Correo Electrónico" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" returnKeyType="next"/>
+      <TextInput style={styles.input} placeholder="Contraseña (mín. 6 caracteres)" value={password} onChangeText={setPassword} secureTextEntry returnKeyType="next"/>
+      <TextInput style={styles.input} placeholder="Confirmar Contraseña" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry returnKeyType="done" onSubmitEditing={handleSignup}/>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={styles.button} />
+      {authLoading ? (
+        <ActivityIndicator size="large" color="#007AFF" style={styles.buttonPlaceholder} />
       ) : (
         <Pressable style={styles.button} onPress={handleSignup}>
           <Text style={styles.buttonText}>Registrarse</Text>
@@ -84,7 +73,7 @@ export default function SignupScreen() {
       )}
 
       <Link href="/(auth)/login" asChild>
-        <Pressable style={styles.linkButton}>
+        <Pressable style={styles.linkButton} disabled={authLoading}>
           <Text style={styles.linkText}>¿Ya tienes cuenta? Inicia sesión</Text>
         </Pressable>
       </Link>
@@ -139,4 +128,5 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 16,
   },
+  buttonPlaceholder: { height: 50, justifyContent: 'center', alignItems: 'center', marginTop: 10, },
 });

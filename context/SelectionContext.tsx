@@ -67,24 +67,21 @@ export const SelectionProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadData = async () => {
       if (authInitializing) {
-        console.log("SelectionContext: AuthProvider todavía inicializando, loadData no se ejecuta.");
-        setIsLoading(true);
-        return; 
+        setIsLoading(true); return;
       }
-
-      console.log(`SelectionContext: loadData ejecutándose. Usuario: ${user?.uid}, Auth inicializado: ${!authInitializing}`);
       setIsLoading(true);
+      console.log(`SelectionContext: loadData. Usuario: ${user?.uid}, Auth init: ${!authInitializing}`);
 
-      if (user) {
-        console.log('SelectionContext: Usuario logueado (UID:', user.uid, '). Intentando cargar de Firestore.');
+      if (user) { // Usuario LOGUEADO
+        console.log('SelectionContext: Usuario logueado (UID:', user.uid, '). Cargando de Firestore.');
         try {
-          // PASO 3: Refactorizar lectura de Firestore
-          const userDocRef = doc(db, 'users', user.uid); // Nueva forma de obtener DocumentReference
-          const docSnapshot = await getDoc(userDocRef);  // Nueva forma de obtener DocumentSnapshot
+          const userDocRef = doc(db, 'users', user.uid); // Modular
+          const docSnapshot = await getDoc(userDocRef);  // Modular
 
-          if (docSnapshot.exists()) { // .exists() sigue siendo un método
+          if (docSnapshot.exists()) {
             console.log('SelectionContext: Documento encontrado en Firestore para UID:', user.uid);
-            const firestoreData = docSnapshot.data(); // .data() sigue siendo un método
+            const firestoreData = docSnapshot.data();
+            // Cargar datos de selección del documento (pueden no existir si solo se creó el perfil)
             const serverSelectedIds = new Set(firestoreData?.selectedCharacterIds || []);
             const serverCachedAnimes = firestoreData?.cachedAnimesData || {};
 
@@ -95,31 +92,33 @@ export const SelectionProvider = ({ children }: { children: ReactNode }) => {
             await AsyncStorage.setItem(CACHED_ANIMES_DATA_KEY, JSON.stringify(serverCachedAnimes));
             console.log('SelectionContext: Estado local y AsyncStorage actualizados desde Firestore.');
           } else {
-            console.log('SelectionContext: No hay documento en Firestore para UID:', user.uid,'. Verificando AsyncStorage para posible migración.');
+            // Esto NO debería pasar si AuthContext.signup SIEMPRE crea el documento de perfil.
+            // Si llegamos aquí, es un usuario autenticado sin documento de perfil en Firestore.
+            // Esto es un caso anómalo o un usuario que existía en Auth pero no en Firestore.
+            // Creamos un documento con los datos de AsyncStorage (que podrían ser de invitado o vacíos).
+            console.warn('SelectionContext: NO hay documento en Firestore para UID:', user.uid,'. Esto es inesperado si el signup funciona. Creando con datos de AsyncStorage.');
             const storedSelectedCharIdsJSON = await AsyncStorage.getItem(SELECTED_CHARACTER_IDS_KEY);
             const localCharIdsArray = storedSelectedCharIdsJSON ? JSON.parse(storedSelectedCharIdsJSON) : [];
             const storedCachedAnimesJSON = await AsyncStorage.getItem(CACHED_ANIMES_DATA_KEY);
             const localCachedAnimes = storedCachedAnimesJSON ? JSON.parse(storedCachedAnimesJSON) : {};
-
-            setSelectedCharacterIds(new Set(localCharIdsArray));
+            
+            setSelectedCharacterIds(new Set<number>(localCharIdsArray));
             setCachedAnimesData(localCachedAnimes);
 
-            if (localCharIdsArray.length > 0 || Object.keys(localCachedAnimes).length > 0) {
-              console.log("SelectionContext: Hay datos en AsyncStorage. Escribiendo a Firestore para nuevo usuario:", user.uid);
-              // PASO 4: Refactorizar escritura en Firestore (set)
-              const newUserDocRef = doc(db, 'users', user.uid); // Obtener referencia de nuevo
-              await setDoc(newUserDocRef, { // Nueva forma de escribir
-                  selectedCharacterIds: localCharIdsArray,
-                  cachedAnimesData: localCachedAnimes,
-              }); // No se necesita { merge: true } si es un documento nuevo, setDoc lo crea.
-            } else {
-                console.log("SelectionContext: AsyncStorage también vacío. Firestore se creará en el primer guardado de datos.");
-            }
+            // Intentar crear el documento con los datos que tengamos, incluyendo perfil básico si es posible
+            // Aunque el perfil básico YA debería haber sido creado por AuthContext.signup.
+            // Aquí solo nos preocupamos por los datos de selección.
+            await setDoc(userDocRef, { // Usar setDoc con merge:true para añadir a doc existente si signup lo creó sin estos campos
+                selectedCharacterIds: localCharIdsArray,
+                cachedAnimesData: localCachedAnimes,
+            }, { merge: true }); // Usar merge:true para no borrar uid, email, username, createdAt
+            console.log('SelectionContext: Documento en Firestore (potencialmente) actualizado/creado con datos de selección desde AsyncStorage.');
           }
         } catch (error) {
-          console.error('SelectionContext: Error cargando/manejando datos de Firestore. Usando AsyncStorage como fallback:', error);
+          console.error('SelectionContext: Error cargando datos de Firestore. Fallback a AsyncStorage.', error);
+          // ... (tu fallback a AsyncStorage) ...
           const storedSelectedCharIds = await AsyncStorage.getItem(SELECTED_CHARACTER_IDS_KEY);
-          if (storedSelectedCharIds) setSelectedCharacterIds(new Set(JSON.parse(storedSelectedCharIds))); else setSelectedCharacterIds(new Set());
+          if (storedSelectedCharIds) setSelectedCharacterIds(new Set<number>(JSON.parse(storedSelectedCharIds))); else setSelectedCharacterIds(new Set<number>());
           const storedCachedAnimes = await AsyncStorage.getItem(CACHED_ANIMES_DATA_KEY);
           if (storedCachedAnimes) setCachedAnimesData(JSON.parse(storedCachedAnimes)); else setCachedAnimesData({});
         }
@@ -141,41 +140,27 @@ export const SelectionProvider = ({ children }: { children: ReactNode }) => {
   const canSaveChanges = !isLoading && !authInitializing;
 
   useEffect(() => { // Guardado de selectedCharacterIds
-    if (!canSaveChanges) {
-        console.log(`SelectionContext: No se guardan selectedCharacterIds. isLoading: ${isLoading}, authInitializing: ${authInitializing}`);
-        return;
-    }
-
+    if (!canSaveChanges) return;
     const dataToStore = Array.from(selectedCharacterIds);
-    AsyncStorage.setItem(SELECTED_CHARACTER_IDS_KEY, JSON.stringify(dataToStore))
-      .catch(error => console.error('SelectionContext (AsyncStorage): Error guardando selectedCharacterIds:', error));
-
+    AsyncStorage.setItem(SELECTED_CHARACTER_IDS_KEY, JSON.stringify(dataToStore));
     if (user) {
-      console.log('SelectionContext (Firestore): Guardando selectedCharacterIds para UID:', user.uid, dataToStore);
-      // PASO 4: Refactorizar escritura en Firestore (set con merge)
+      console.log('SelectionContext (Firestore Modular): Guardando selectedCharacterIds para UID:', user.uid);
       const userDocRef = doc(db, 'users', user.uid);
-      setDoc(userDocRef, { selectedCharacterIds: dataToStore }, { merge: true } )
-        .catch(error => console.error('SelectionContext (Firestore): Error guardando selectedCharacterIds:', error));
+      setDoc(userDocRef, { selectedCharacterIds: dataToStore }, { merge: true })
+        .catch(e => console.error("Firestore save selectedCharIds failed:", e));
     }
-  }, [selectedCharacterIds, user, canSaveChanges, isLoading, authInitializing]);
+  }, [selectedCharacterIds, user, canSaveChanges]);
 
   useEffect(() => { // Guardado de cachedAnimesData
-    if (!canSaveChanges) {
-        console.log(`SelectionContext: No se guardan cachedAnimesData. isLoading: ${isLoading}, authInitializing: ${authInitializing}`);
-        return;
-    }
-
-    AsyncStorage.setItem(CACHED_ANIMES_DATA_KEY, JSON.stringify(cachedAnimesData))
-      .catch(error => console.error('SelectionContext (AsyncStorage): Error guardando cachedAnimesData:', error));
-
+    if (!canSaveChanges) return;
+    AsyncStorage.setItem(CACHED_ANIMES_DATA_KEY, JSON.stringify(cachedAnimesData));
     if (user) {
-      console.log('SelectionContext (Firestore): Guardando cachedAnimesData para UID:', user.uid);
-      // PASO 4: Refactorizar escritura en Firestore (set con merge)
+      console.log('SelectionContext (Firestore Modular): Guardando cachedAnimesData para UID:', user.uid);
       const userDocRef = doc(db, 'users', user.uid);
       setDoc(userDocRef, { cachedAnimesData: cachedAnimesData }, { merge: true })
-        .catch(error => console.error('SelectionContext (Firestore): Error guardando cachedAnimesData:', error));
+        .catch(e => console.error("Firestore save cachedAnimesData failed:", e));
     }
-  }, [cachedAnimesData, user, canSaveChanges, isLoading, authInitializing]);
+  }, [cachedAnimesData, user, canSaveChanges]);
   
   // ... (el resto de las funciones del contexto: isCharacterSelected, isAnimeSelected, addCharacter, etc.
   //      NO necesitan cambios directos en su lógica interna de Firebase, ya que solo modifican el estado
