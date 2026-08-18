@@ -4,7 +4,6 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -60,5 +59,8 @@
     "eslint-config-expo": "~9.2.0",
     "typescript": "~5.8.3"
   },
-  "private": true
+  "private": true,
+  "description": "App movil de juegos sociales sobre anime: autenticacion Firebase, catalogo via Jikan API y modo invitado offline.",
+  "author": "Melvin0406",
+  "license": "MIT"
 }
